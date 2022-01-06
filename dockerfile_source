@@ -14,6 +14,8 @@ RUN dnf upgrade -y && \
         libtool \
         make \
         pkgconfig \
+        python3 \
+        tree \ 
         zlib-devel
 
 RUN mkdir /ffmpeg_sources && \
@@ -103,4 +105,9 @@ RUN cd /ffmpeg_sources && \
     make -j 16 && \
     make install
 
-CMD ffmpeg -version
+COPY ./content/Rick.and.Morty.S02E05.Get.Schwifty.1080p.TrueHD.5.1.VC-1.REMUX-FraMeSToR.mkv /temp/Rick.and.Morty.S02E05.Get.Schwifty.1080p.TrueHD.5.1.VC-1.REMUX-FraMeSToR.mkv
+COPY ./shuffle_content.py /temp/shuffle_content.py
+
+ENV STREAM_ADDRESS "rtmp://address:port/live/stream_key"
+
+CMD python3 /temp/shuffle_content.py
