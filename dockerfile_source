@@ -1,4 +1,13 @@
-FROM rockylinux
+FROM rockylinux:latest
+
+ENV STREAM_ADDRESS "rtmp://address:port/live/stream_key"
+ENV CONTENT_DIR "/content"
+ENV UID "99"
+ENV GID "100"
+ENV VIDEO_ENCODER_PRESET "medium"
+ENV VIDEO_FRAMERATE "24"
+ENV VIDEO_ENCODER_CRF "16"
+ENV VIDEO_ENCODER_KEYFRAME_INTERVAL "48"
 
 RUN dnf upgrade -y && \
     dnf install -y \
@@ -15,7 +24,7 @@ RUN dnf upgrade -y && \
         make \
         pkgconfig \
         python3 \
-        tree \ 
+        tree \
         zlib-devel
 
 RUN mkdir /ffmpeg_sources && \
@@ -24,72 +33,72 @@ RUN mkdir /ffmpeg_sources && \
     tar xjvf nasm-2.15.05.tar.bz2 && \
     cd nasm-2.15.05 && \
     ./autogen.sh && \
-    ./configure --prefix="/ffmpeg_build" --bindir="/bin"&& \
-    make -j 16 && \
+    ./configure --prefix="/tmp/ffmpeg_build" --bindir="/bin"&& \
+    make -j 24 && \
     make install
 
 RUN cd /ffmpeg_sources && \
     curl -O -L https://www.tortall.net/projects/yasm/releases/yasm-1.3.0.tar.gz && \
     tar xzvf yasm-1.3.0.tar.gz && \
     cd yasm-1.3.0 && \
-    ./configure --prefix="/ffmpeg_build" --bindir="/bin" && \
-    make -j 16 && \
+    ./configure --prefix="/tmp/ffmpeg_build" --bindir="/bin" && \
+    make -j 24 && \
     make install
 
 RUN cd /ffmpeg_sources && \
     git clone --branch stable --depth 1 https://code.videolan.org/videolan/x264.git && \
     cd x264 && \
-    PKG_CONFIG_PATH="/ffmpeg_build/lib/pkgconfig" ./configure --prefix="/ffmpeg_build" --bindir="/bin" --enable-static && \
-    make -j 16 && \
+    PKG_CONFIG_PATH="/tmp/ffmpeg_build/lib/pkgconfig" ./configure --prefix="/tmp/ffmpeg_build" --bindir="/bin" --enable-static && \
+    make -j 24 && \
     make install
 
 RUN cd /ffmpeg_sources && \
     git clone --branch stable --depth 2 https://bitbucket.org/multicoreware/x265_git && \
     cd /ffmpeg_sources/x265_git/build/linux && \
-    cmake -G "Unix Makefiles" -DCMAKE_INSTALL_PREFIX="/ffmpeg_build" -DENABLE_SHARED:bool=off ../../source && \
-    make -j 16 && \
+    cmake -G "Unix Makefiles" -DCMAKE_INSTALL_PREFIX="/tmp/ffmpeg_build" -DENABLE_SHARED:bool=off ../../source && \
+    make -j 24 && \
     make install
 
 RUN cd /ffmpeg_sources && \
     git clone --depth 1 https://github.com/mstorsjo/fdk-aac && \
     cd fdk-aac && \
     autoreconf -fiv && \
-    ./configure --prefix="/ffmpeg_build" --disable-shared && \
-    make -j 16 && \
+    ./configure --prefix="/tmp/ffmpeg_build" --disable-shared && \
+    make -j 24 && \
     make install
 
 RUN cd /ffmpeg_sources && \
     curl -O -L https://downloads.sourceforge.net/project/lame/lame/3.100/lame-3.100.tar.gz && \
     tar xzvf lame-3.100.tar.gz && \
     cd lame-3.100 && \
-    ./configure --prefix="/ffmpeg_build" --bindir="/bin" --disable-shared --enable-nasm && \
-    make -j 16 && \
+    ./configure --prefix="/tmp/ffmpeg_build" --bindir="/bin" --disable-shared --enable-nasm && \
+    make -j 24 && \
     make install
 
 RUN cd /ffmpeg_sources && \
     curl -O -L https://archive.mozilla.org/pub/opus/opus-1.3.1.tar.gz && \
     tar xzvf opus-1.3.1.tar.gz && \
     cd opus-1.3.1 && \
-    ./configure --prefix="/ffmpeg_build" --disable-shared && \
-    make -j 16 && \
+    ./configure --prefix="/tmp/ffmpeg_build" --disable-shared && \
+    make -j 24 && \
     make install
 
 RUN cd /ffmpeg_sources && \
     git clone --depth 1 https://chromium.googlesource.com/webm/libvpx.git && \
     cd libvpx && \
-    ./configure --prefix="/ffmpeg_build" --disable-examples --disable-unit-tests --enable-vp9-highbitdepth --as=yasm && \
-    make -j 16 && \
+    ./configure --prefix="/tmp/ffmpeg_build" --disable-examples --disable-unit-tests --enable-vp9-highbitdepth --as=yasm && \
+    make -j 24 && \
     make install
 
 RUN cd /ffmpeg_sources && \
     curl -O -L https://ffmpeg.org/releases/ffmpeg-snapshot.tar.bz2 && \
     tar xjvf ffmpeg-snapshot.tar.bz2 && \
     cd ffmpeg && \
-    PATH="/bin" PKG_CONFIG_PATH="/ffmpeg_build/lib/pkgconfig" ./configure \
-    --prefix="/ffmpeg_build" \
+    PATH="/bin" PKG_CONFIG_PATH="/tmp/ffmpeg_build/lib/pkgconfig" ./configure \
+    --prefix="/tmp/ffmpeg_build" \
     --pkg-config-flags="--static" \
-    --extra-cflags="-I/ffmpeg_build/include" \
-    --extra-ldflags="-L/ffmpeg_build/lib" \
+    --extra-cflags="-I/tmp/ffmpeg_build/include" \
+    --extra-ldflags="-L/tmp/ffmpeg_build/lib" \
     --extra-libs=-lpthread \
     --extra-libs=-lm \
     --bindir="/bin" \
@@ -102,11 +111,11 @@ RUN cd /ffmpeg_sources && \
     --enable-libx264 \
     --enable-libx265 \
     --enable-nonfree && \
-    make -j 16 && \
+    make -j 24 && \
     make install
 
-COPY ./shuffle_content.py /temp/shuffle_content.py
+USER ${UID}:${GID}
 
-ENV STREAM_ADDRESS "rtmp://address:port/live/stream_key"
+COPY ./shuffle_content.py /tmp/shuffle_content.py
 
-CMD python3 /temp/shuffle_content.py
+CMD python3 /tmp/shuffle_content.py
