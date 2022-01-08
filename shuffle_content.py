@@ -7,7 +7,6 @@ from time import sleep
 
 def main():
     content_path = environ.get("CONTENT_DIR")
-    print(content_path)
     tree_command = "tree -vnfio /tmp/tree.txt " + content_path
     video_filenames = []
 
@@ -40,7 +39,6 @@ def main():
 
     # itterate through and keep only video_filenames ending in mkv or mp4
     for file in all_filenames:
-        print(file)
         path = file.strip("\n")
 
         if path[-4:] in [".mkv", ".mp4"]:
@@ -67,6 +65,8 @@ def main():
         "libx264",
         "-preset",
         environ.get("VIDEO_ENCODER_PRESET"),
+        "-tune",
+        "animation",
         "-crf",
         environ.get("VIDEO_ENCODER_CRF"),
         "-vf",
@@ -83,13 +83,12 @@ def main():
         "flv",
         environ.get("STREAM_ADDRESS"),
     ]
-    print(video_filenames)
     print(ffmpeg_cmd)
     process = Popen(ffmpeg_cmd, stdout=PIPE)
     output, error = process.communicate()
 
     while not error:
-        sleep(10)
+        sleep(5)
 
         ffmpeg_cmd = [
             "ffmpeg",
@@ -126,7 +125,6 @@ def main():
             "flv",
             environ.get("STREAM_ADDRESS"),
         ]
-        print(video_filenames)
         print(ffmpeg_cmd)
         process = Popen(ffmpeg_cmd, stdout=PIPE)
         output, error = process.communicate()
