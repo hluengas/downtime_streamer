@@ -50,7 +50,7 @@ def main():
         "ffmpeg",
         "-re",
         "-i",
-        choice(video_filenames),
+        "error.mkv",
         "-map",
         "0:v:0",
         "-map",
@@ -81,53 +81,20 @@ def main():
         "2",
         "-f",
         "flv",
-        environ.get("STREAM_ADDRESS"),
+        environ.get("STREAM_ADDRESS")
     ]
+
+    while True:
+        (output, error) = play_random(ffmpeg_cmd, video_filenames)
+
+def play_random(ffmpeg_cmd, video_filenames):
+    sleep(5.0)
+    ffmpeg_cmd[3] = choice(video_filenames)
     print(ffmpeg_cmd)
     process = Popen(ffmpeg_cmd, stdout=PIPE)
-    output, error = process.communicate()
-
-    while not error:
-        sleep(5)
-
-        ffmpeg_cmd = [
-            "ffmpeg",
-            "-re",
-            "-i",
-            choice(video_filenames),
-            "-map",
-            "0:v:0",
-            "-map",
-            "0:a:0",
-            "-map",
-            "-0:s",
-            "-map_metadata",
-            "-1",
-            "-framerate",
-            environ.get("VIDEO_FRAMERATE"),
-            "-c:v",
-            "libx264",
-            "-preset",
-            environ.get("VIDEO_AVC_PRESET"),
-            "-crf",
-            environ.get("VIDEO_ENCODER_CRF"),
-            "-vf",
-            "format=yuv420p",
-            "-g",
-            environ.get("VIDEO_ENCODER_KEYFRAME_INTERVAL"),
-            "-c:a",
-            "aac",
-            "-b:a",
-            "320k",
-            "-ac",
-            "2",
-            "-f",
-            "flv",
-            environ.get("STREAM_ADDRESS"),
-        ]
-        print(ffmpeg_cmd)
-        process = Popen(ffmpeg_cmd, stdout=PIPE)
-        output, error = process.communicate()
+    return(process.communicate())
+        
 
 if __name__ == "__main__":
     exit(main())
+
