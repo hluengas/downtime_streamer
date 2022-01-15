@@ -28,13 +28,17 @@ def main():
         "king.of.the.hill",
         "samurai.jack",
         "primal",
-        "cowboy bebop",
+        "cowboy.bebop",
         "justice.league",
         "one-punch.man",
         "over.the.garden.wall",
         "samurai.champloo",
         "scooby-doo",
-        "solar.opposites"
+        "solar.opposites",
+        "avatar.the.last.airbender",
+        "batman.the.animated.series",
+        "dragon.ball",
+        "harvey.birdman.attorney.at.law"
     ]
 
     # itterate through and keep only video_filenames ending in mkv or mp4
@@ -43,22 +47,20 @@ def main():
 
         if path[-4:] in [".mkv", ".mp4"]:
             for series in whitelist:
-                if series in path.lower():
+                if series in path.lower().replace(" ", "."):
                     video_filenames.append(path)
 
-    ffmpeg_cmd = [
+    ffmpeg_cmd_1 = [
         "ffmpeg",
         "-re",
-        "-i",
-        "error.mkv",
+        "-i"
+    ]
+
+    ffmpeg_cmd_2 = [
         "-map",
         "0:v:0",
         "-map",
         "0:a:0",
-        "-map",
-        "-0:s",
-        "-map_metadata",
-        "-1",
         "-framerate",
         environ.get("VIDEO_FRAMERATE"),
         "-c:v",
@@ -69,8 +71,6 @@ def main():
         "animation",
         "-crf",
         environ.get("VIDEO_ENCODER_CRF"),
-        "-vf",
-        "format=yuv420p",
         "-g",
         environ.get("VIDEO_ENCODER_KEYFRAME_INTERVAL"),
         "-c:a",
@@ -84,17 +84,20 @@ def main():
         environ.get("STREAM_ADDRESS")
     ]
 
-    while True:
-        (output, error) = play_random(ffmpeg_cmd, video_filenames)
+    ffmpeg_cmd = ffmpeg_cmd_1 + [choice(video_filenames)] + ffmpeg_cmd_2
+    (output, error) = play_random(ffmpeg_cmd)
 
-def play_random(ffmpeg_cmd, video_filenames):
+    while (not error):
+        ffmpeg_cmd = ffmpeg_cmd_1 + [choice(video_filenames)] + ffmpeg_cmd_2
+        (output, error) = play_random(ffmpeg_cmd)
+
+
+def play_random(ffmpeg_cmd):
     sleep(5.0)
-    ffmpeg_cmd[3] = choice(video_filenames)
     print(ffmpeg_cmd)
     process = Popen(ffmpeg_cmd, stdout=PIPE)
     return(process.communicate())
-        
+
 
 if __name__ == "__main__":
     exit(main())
-
