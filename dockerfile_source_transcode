@@ -1,13 +1,10 @@
 FROM rockylinux:latest
 
-ENV INPUT_DIR "/content_input"
-ENV OUTPUT_DIR "/content_output"
+ENV INPUT_DIR "/tmp/content_input"
+ENV OUTPUT_DIR "/tmp/content_output"
 ENV UID "99"
 ENV GID "100"
-ENV VIDEO_ENCODER_PRESET "slow"
-ENV VIDEO_FRAMERATE "ntsc_film"
-ENV VIDEO_ENCODER_CRF "14"
-ENV VIDEO_ENCODER_KEYFRAME_INTERVAL "48"
+ENV VIDEO_ENCODER_PRESET "medium"
 
 RUN dnf upgrade -y && \
     dnf install -y \

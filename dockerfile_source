@@ -1,13 +1,9 @@
 FROM rockylinux:latest
 
 ENV STREAM_ADDRESS "rtmp://address:port/live/stream_key"
-ENV CONTENT_DIR "/content"
+ENV CONTENT_DIR "/tmp/content"
 ENV UID "99"
 ENV GID "100"
-ENV VIDEO_ENCODER_PRESET "fast"
-ENV VIDEO_FRAMERATE "24"
-ENV VIDEO_ENCODER_CRF "18"
-ENV VIDEO_ENCODER_KEYFRAME_INTERVAL "48"
 
 RUN dnf upgrade -y && \
     dnf install -y \

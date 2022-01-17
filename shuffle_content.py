@@ -1,102 +1,69 @@
 from sys import exit
-from random import choice
+from random import choice,shuffle
 from os import environ
 from subprocess import Popen, PIPE
 from time import sleep
 
 
 def main():
+
+    while(True):
+
+        input_video_paths = get_content_paths()
+        playlist = []
+
+        for input_path in input_video_paths:
+            playlist.append("file \'" + input_path + "\'\n")
+
+        shuffle(playlist)
+
+        with open('/tmp/playlist.txt', 'w') as writer:
+            writer.writelines(playlist)
+            writer.close()
+
+        ffmpeg_cmd = [
+            "ffmpeg",
+            "-f",
+            "concat",
+            "-safe",
+            "0",
+            "-re",
+            "-i",
+            "/tmp/playlist.txt",
+            "-c",
+            "copy",
+            "-f",
+            "flv",
+            environ.get("STREAM_ADDRESS")
+        ]
+
+        sleep(1.0)
+        print(ffmpeg_cmd)
+        process = Popen(ffmpeg_cmd, stdout=PIPE)
+        (output, error) = process.communicate()
+
+
+def get_content_paths():
+    input_video_paths = []
+
     content_path = environ.get("CONTENT_DIR")
     tree_command = "tree -vnfio /tmp/tree.txt " + content_path
-    video_filenames = []
 
     # use the linux tree command to recursively parse the directory structure
     process = Popen(tree_command.split(), stdout=PIPE)
     _output, _error = process.communicate()
 
-    # read the tree output file into a list of video_filenames
+    # read the tree output file into a list of input_video_paths
     with open("/tmp/tree.txt") as open_file:
         all_filenames = open_file.readlines()
 
-    whitelist = [
-        "archer",
-        "south.park",
-        "rick.and.morty",
-        "futurama",
-        "brickleberry",
-        "gravity.falls",
-        "king.of.the.hill",
-        "samurai.jack",
-        "primal",
-        "cowboy.bebop",
-        "justice.league",
-        "one-punch.man",
-        "over.the.garden.wall",
-        "samurai.champloo",
-        "scooby-doo",
-        "solar.opposites",
-        "avatar.the.last.airbender",
-        "batman.the.animated.series",
-        "dragon.ball",
-        "harvey.birdman.attorney.at.law"
-    ]
-
-    # itterate through and keep only video_filenames ending in mkv or mp4
+    # itterate through and keep only input_video_paths ending in mkv or mp4
     for file in all_filenames:
         path = file.strip("\n")
+        if path[-4:] == ".flv":
+            input_video_paths.append(path)
 
-        if path[-4:] in [".mkv", ".mp4"]:
-            for series in whitelist:
-                if series in path.lower().replace(" ", "."):
-                    video_filenames.append(path)
-
-    ffmpeg_cmd_1 = [
-        "ffmpeg",
-        "-re",
-        "-i"
-    ]
-
-    ffmpeg_cmd_2 = [
-        "-map",
-        "0:v:0",
-        "-map",
-        "0:a:0",
-        "-framerate",
-        environ.get("VIDEO_FRAMERATE"),
-        "-c:v",
-        "libx264",
-        "-preset",
-        environ.get("VIDEO_ENCODER_PRESET"),
-        "-tune",
-        "animation",
-        "-crf",
-        environ.get("VIDEO_ENCODER_CRF"),
-        "-g",
-        environ.get("VIDEO_ENCODER_KEYFRAME_INTERVAL"),
-        "-c:a",
-        "aac",
-        "-b:a",
-        "320k",
-        "-ac",
-        "2",
-        "-f",
-        "flv",
-        environ.get("STREAM_ADDRESS")
-    ]
-
-    ffmpeg_cmd = ffmpeg_cmd_1 + [choice(video_filenames)] + ffmpeg_cmd_2
-    (output, error) = play_random(ffmpeg_cmd)
-
-    while (not error):
-        ffmpeg_cmd = ffmpeg_cmd_1 + [choice(video_filenames)] + ffmpeg_cmd_2
-        (output, error) = play_random(ffmpeg_cmd)
-
-
-def play_random(ffmpeg_cmd):
-    sleep(5.0)
-    print(ffmpeg_cmd)
-    process = Popen(ffmpeg_cmd, stdout=PIPE)
-    return(process.communicate())
+    return input_video_paths
 
 
 if __name__ == "__main__":
