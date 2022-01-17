@@ -41,6 +41,7 @@ def main():
         print(ffmpeg_cmd)
         process = Popen(ffmpeg_cmd, stdout=PIPE)
         (output, error) = process.communicate()
+        sleep(9.0)
 
 
 def get_content_paths():
