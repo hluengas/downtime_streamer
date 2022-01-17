@@ -2,6 +2,7 @@ from http.client import PROCESSING
 from sys import exit
 from random import choice
 from os import environ
+from os.path import exists
 from subprocess import Popen, PIPE
 from time import sleep
 
@@ -29,6 +30,7 @@ def main():
 
     ffmpeg_cmd = [
         "ffmpeg",
+        "-y",
         "-i",
         "INPUT_PATH",
         "-map",
@@ -81,10 +83,14 @@ def main():
         print("INPUT_PATH: " + video_input_path)
         print("TMP_PATH: " + video_output_path_tmp)
         print("FLV_PATH: " + video_output_path_flv)
+
+        if exists(video_output_path_flv):
+            print("FILE ALREADY EXISTS, SKIPPING...")
+            continue
         sleep(1.0)
 
         # set ffmpeg_cmd
-        ffmpeg_cmd[2] = video_input_path
+        ffmpeg_cmd[3] = video_input_path
         ffmpeg_cmd[-1] = video_output_path_tmp
         print("FFMPEG COMMAND:")
         print(ffmpeg_cmd)
