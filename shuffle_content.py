@@ -18,7 +18,7 @@ def main():
         shuffle(playlist)
 
         with open('/tmp/playlist.txt', 'w') as writer:
-            writer.writelines(playlist)
+            writer.writelines(playlist[0:9])
             writer.close()
 
         ffmpeg_cmd = [
