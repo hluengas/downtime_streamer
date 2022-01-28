@@ -2,26 +2,27 @@ FROM rockylinux:latest
 
 ENV STREAM_ADDRESS "rtmp://address:port/live/stream_key"
 ENV CONTENT_DIR "/tmp/content"
+ENV META_DIR "/tmp/meta"
 ENV UID "99"
 ENV GID "100"
 
 RUN dnf upgrade -y && \
     dnf install -y \
-        autoconf \
-        automake \
-        bzip2 \
-        bzip2-devel \
-        cmake \
-        freetype-devel \
-        gcc \
-        gcc-c++ \
-        git \
-        libtool \
-        make \
-        pkgconfig \
-        python3 \
-        tree \
-        zlib-devel
+    autoconf \
+    automake \
+    bzip2 \
+    bzip2-devel \
+    cmake \
+    freetype-devel \
+    gcc \
+    gcc-c++ \
+    git \
+    libtool \
+    make \
+    pkgconfig \
+    python3 \
+    tree \
+    zlib-devel
 
 RUN mkdir /ffmpeg_sources && \
     cd /ffmpeg_sources && \
