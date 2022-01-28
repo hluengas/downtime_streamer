@@ -1,5 +1,5 @@
 from sys import exit
-from random import choice, shuffle
+from random import choice, shuffle, sample
 from os import environ
 from os.path import isfile
 from subprocess import Popen, PIPE
@@ -35,20 +35,15 @@ def main():
 
     while(True):
 
-        # get available input video paths
-        input_video_paths = get_content_paths()
-        # get list of previously played episodes
-        played_episodes = get_aleady_played_list()
+        # get a list of paths to all available episodes
+        master_episode_list = parse_content_directory(CONTENT_PATH)
 
-        # limit ffmpeg_playlist len
-        playlist_len = min(len(input_video_paths), 24)
-
-        # shuffle input order
-        shuffle(input_video_paths)
+        # generate a random ordering of the epsiode list
+        shuffed_episode_list = sample(master_episode_list)
 
         # put into the format ffmpeg expects: (file '<filename>')
         ffmpeg_playlist = []
-        for input_path in input_video_paths:
+        for input_path in master_episode_list:
             if (input_path not in played_episodes):
                 ffmpeg_playlist.append("file \'" + input_path + "\'")
             else:
@@ -76,7 +71,7 @@ def main():
         # write the files in the upcoming playlist to the play history
         with open(HISTORY_PATH, 'a') as out_file_play_history:
             for i in range(playlist_len):
-                out_file_play_history.write(input_video_paths[i] + '\n')
+                out_file_play_history.write(master_episode_list[i] + '\n')
 
         # debug log
         print("[###---INFO---###]")
@@ -89,42 +84,28 @@ def main():
         sleep(10.0)
 
 
-def get_content_paths():
-    input_video_paths = []
-
-    tree_command = "tree -afUin -P *.flv -o " + TREE_PATH + " " + CONTENT_PATH
+def parse_content_directory(target_dir):
 
     # use the linux tree command to recursively parse the directory structure
+    # using flags we will discard the tree characters and keep only the files/directory paths
+    # the resulting list of all files & directoires is written to a text file
+    tree_command = "tree -afUin -P *.flv -o " + TREE_PATH + " " + target_dir
     process = Popen(tree_command.split(), stdout=PIPE)
     _output, _error = process.communicate()
 
-    # read the tree output file into a list of input_video_paths
+    # read the tree output file into a list of file paths
     with open(TREE_PATH) as in_file:
         all_filenames = in_file.read().splitlines()
 
-    # itterate through and keep only input_video_paths ending in flv
+    episode_list = []
+
+    # itterate through and keep only paths ending in ".flv"
     for file in all_filenames:
-        # path = file.strip("\n")
         path = file
         if path[-4:] == ".flv":
-            input_video_paths.append(path)
+            episode_list.append(path)
 
-    return input_video_paths
-
-
-def get_aleady_played_list():
-    played_episodes = []
-
-    # check if list file exists
-    if (not isfile(HISTORY_PATH)):
-        # if not create it
-        process = Popen(["touch", HISTORY_PATH], stdout=PIPE)
-        print(process.communicate())
-
-    with open(HISTORY_PATH) as in_file:
-        played_episodes = in_file.read().splitlines()
-
-    return played_episodes
+    return episode_list
 
 
 if __name__ == "__main__":
