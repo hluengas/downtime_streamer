@@ -114,6 +114,6 @@ RUN cd /ffmpeg_sources && \
 
 USER ${UID}:${GID}
 
-COPY ./shuffle_content.py /tmp/shuffle_content.py
+COPY ./shuffle_content.py /tmp/meta/shuffle_content.py
 
-CMD python3 /tmp/shuffle_content.py
+CMD ["python3", "-u", "/tmp/meta/shuffle_content.py"]
