@@ -71,7 +71,7 @@ def main():
     for i, video_input_path in enumerate(video_paths):
         # set io paths
         print("PROCESSING: Video " + str(i+1) + " of " + str(len(video_paths)))
-        video_filename = video_input_path.split("/")[-1][:-4]
+        video_filename = video_input_path.split("/")[-1][:-4].replace(" ", ".")
         video_output_path_flv = "".join([
             environ.get("OUTPUT_DIR"),
             "/",
