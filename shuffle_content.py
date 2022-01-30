@@ -1,9 +1,12 @@
+from pickle import NONE
 from sys import exit
 from random import choice, shuffle, sample
 from os import environ
 from os.path import isfile
-from subprocess import Popen, PIPE
+from subprocess import run, Popen, PIPE, STDOUT
 from time import sleep
+from math import ceil
+from datetime import datetime
 
 STREAM_ADDRESS = environ.get("STREAM_ADDRESS")
 
@@ -35,8 +38,6 @@ FFMPEG_CMD = [
 ]
 
 
-
-
 PLAYLIST = [
     "file \'" + META_PATH + "/episode_a.flv\'\n",
     "file \'" + META_PATH + "/bumper_a.flv\'\n",
@@ -52,64 +53,106 @@ def main():
     master_bumper_list = parse_content_directory(BUMPER_PATH)
 
     # generate a random ordering of the epsiode list
-    shuffed_episode_list = sample(master_episode_list, len(master_episode_list))
+    shuffed_episode_list = sample(
+        master_episode_list, len(master_episode_list))
     shuffed_bumper_list = sample(master_bumper_list, len(master_bumper_list))
 
     # create the swap-chain playlsit: episode_a -> bumper_a -> episode_b -> bumper_b -> ... repeat...
     create_playlist_file()
 
-    # set initial linup
-    episode_a = shuffed_episode_list.pop()
-    bumper_a = shuffed_bumper_list.pop()
-    symlink("a", episode_a, bumper_a)
+    # set initial lineup
+    current_episode_letter = "a"
+    next_episode_letter = "b"
 
-    # while(True):
-    #     episode_a = shuffed_episode_list.pop()
-    #     episode_b = shuffed_episode_list.pop()
-    #     bumper_a = shuffed_bumper_list.pop()
-    #     bumper_b = shuffed_bumper_list.pop()
+    # get next episode & bumper
+    episode = shuffed_episode_list.pop()
+    bumper = shuffed_bumper_list.pop()
+
+    # link next episode & bumpers
+    symlink_episode(current_episode_letter, episode)
+    symlink_bumper(current_episode_letter, bumper)
+
+    # swap current & next
+    temp = current_episode_letter
+    current_episode_letter = next_episode_letter
+    next_episode_letter = temp
+
+    # get wait time
+    episode_wait_time = get_media_duration(episode)
+    bumper_wait_time = get_media_duration(bumper)
 
     # start ffmpeg
-    # process = Popen(FFMPEG_CMD, stdout=PIPE)
-    # (output, error) = process.communicate()
+    ffmpeg_process = Popen(FFMPEG_CMD, stdout=PIPE,
+                           stderr=PIPE, universal_newlines=True)
+
+    while(len(shuffed_episode_list) and len(shuffed_bumper_list)):
+
+        # get next episode & bumper
+        episode = shuffed_episode_list.pop()
+        bumper = shuffed_bumper_list.pop()
+
+        # link next episode & bumpers
+        symlink_episode(current_episode_letter, episode)
+        # wait for episode completion
+        print(episode_wait_time)
+        sleep(episode_wait_time)
+
+        # link next episode & bumpers
+        symlink_bumper(current_episode_letter, bumper)
+        # wait for episode completion
+        print(bumper_wait_time)
+        sleep(bumper_wait_time)
+
+        # swap current & next
+        temp = current_episode_letter
+        current_episode_letter = next_episode_letter
+        next_episode_letter = temp
+
+        # get next wait time
+        # get wait time
+        episode_wait_time = get_media_duration(episode)
+        bumper_wait_time = get_media_duration(bumper)
+
+    # end ffmpeg
+    (_output, _error) = ffmpeg_process.communicate()
+
 
 def get_media_duration(content_path):
-
     ffprobe_command = [
-    "ffprobe",
-    "-v",
-    "error",
-    "-show_entries",
-    "format=duration",
-    "-of",
-    "default=noprint_wrappers=1:nokey=1",
-    content_path
-]
-    
+        "ffprobe",
+        "-v",
+        "error",
+        "-show_entries",
+        "format=duration",
+        "-of",
+        "default=noprint_wrappers=1:nokey=1",
+        content_path
+    ]
     # ffprobe
-    print(ffprobe_command)
-    process = Popen(ffprobe_command, stdout=PIPE)
-    (output, error) = process.communicate()
-
-    (EPISODE_META_PATH + "a.flv")
-
-    return()
+    ffprobe_process = Popen(ffprobe_command, stdout=PIPE)
+    (output, error) = ffprobe_process.communicate()
+    return(float(output))
 
 
-def symlink(letter, episode, bumper):
+def symlink_episode(letter, episode):
+    print("[LETTER]: " + letter.lower())
+
     # symlink episode
     link_command = "ln -sf " + episode + " " + \
         EPISODE_META_PATH + letter.lower() + ".flv"
     print(link_command)
-    process = Popen(link_command.split(), stdout=PIPE)
-    _output, _error = process.communicate()
+    link_process = Popen(link_command.split(), stdout=PIPE)
+    _output, _error = link_process.communicate()
+
+def symlink_bumper(letter, bumper):
+    print("[LETTER]: " + letter.lower())
 
     # symlink bumper
     link_command = "ln -sf " + bumper + " " + BUMPER_META_PATH + letter.lower() + \
         ".flv"
     print(link_command)
-    process = Popen(link_command.split(), stdout=PIPE)
-    _output, _error = process.communicate()
+    link_process = Popen(link_command.split(), stdout=PIPE)
+    _output, _error = link_process.communicate()
 
 
 def parse_content_directory(target_dir):
@@ -119,8 +162,8 @@ def parse_content_directory(target_dir):
     # the resulting list of all files & directoires is written to a text file
     tree_command = "tree -afUin -P *.flv -o " + TREE_PATH + " " + target_dir
     print(tree_command)
-    process = Popen(tree_command.split(), stdout=PIPE)
-    _output, _error = process.communicate()
+    tree_process = Popen(tree_command.split(), stdout=PIPE)
+    _output, _error = tree_process.communicate()
 
     # read the tree output file into a list of file paths
     with open(TREE_PATH) as in_file:
@@ -141,8 +184,8 @@ def create_playlist_file():
     # check if the playlist file exists
     if (not isfile(PLAYLIST_PATH)):
         # if not create it
-        process = Popen(["touch", PLAYLIST_PATH], stdout=PIPE)
-        print(process.communicate())
+        touch_process = Popen(["touch", PLAYLIST_PATH], stdout=PIPE)
+        touch_process.communicate()
 
     # write the ffmpeg_playlist to its file
     with open(PLAYLIST_PATH, 'w') as playlist_out_file:
