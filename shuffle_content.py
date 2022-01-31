@@ -21,6 +21,8 @@ HISTORY_PATH = META_PATH + "/already_played.txt"
 PLAYLIST_PATH = META_PATH + "/ffmpeg_playlist.txt"
 TREE_PATH = META_PATH + "/tree.txt"
 
+SECTION_BREAK = "#########################################################################"
+
 FFMPEG_CMD = [
     "ffmpeg",
     "-f",
@@ -38,8 +40,6 @@ FFMPEG_CMD = [
     "flv",
     STREAM_ADDRESS
 ]
-
-
 PLAYLIST = [
     "file \'" + META_PATH + "/video_0.flv\'\n",
     "file \'" + META_PATH + "/video_1.flv\'\n",
@@ -76,24 +76,38 @@ def main():
     # create the swap-chain playlsit: episode_a -> bumper_a -> episode_b -> bumper_b -> ... repeat...
     create_playlist_file()
 
-    prepare_episode(shuffed_bumper_list, 0, -1)
-    prepare_episode(shuffed_bumper_list, 1, -1)
+    index_playing = -1
+    index_to_prepare = 0
+    prepare_episode(shuffed_bumper_list, index_to_prepare)
+    index_to_prepare = index_to_prepare + 1
 
     # start ffmpeg
-    ffmpeg_process = Popen(FFMPEG_CMD, stdout=PIPE, stderr=PIPE, universal_newlines=True)
+    ffmpeg_process = Popen(FFMPEG_CMD, stdout=PIPE, stderr=STDOUT, universal_newlines=True)
+    print(SECTION_BREAK)
     print("[FFMPEG Started!]\n")
 
     while(True):
-        prepare_episode(shuffed_bumper_list, 2, 0)
-        prepare_episode(shuffed_bumper_list, 3, 1)
-        prepare_episode(shuffed_bumper_list, 0, 2)
-        prepare_episode(shuffed_bumper_list, 1, 3)
+
+        for line in ffmpeg_process.stdout:
+            if("[flv @" in line):
+                print(SECTION_BREAK)
+                print(line, end="")
+                print("[Detected Episode Change]")
+                print("[Episode Completed]: " + str(index_playing) + "\n")
+
+                if (index_to_prepare % 2):
+                    prepare_episode(shuffed_episode_list, index_to_prepare)
+                else:
+                    prepare_episode(shuffed_bumper_list, index_to_prepare)
+
+                index_playing = (index_playing + 1) % 4
+                index_to_prepare = (index_to_prepare + 1) % 4
 
     # end ffmpeg
     (_output, _error) = ffmpeg_process.communicate()
 
 
-def prepare_episode(input_list, index_to_prepare, index_to_wait_on):
+def prepare_episode(input_list, index_to_prepare):
     global VIDEO_DURATIONS
     global VIDEO_PATHS
     global VIDEO_LINKS
@@ -101,20 +115,20 @@ def prepare_episode(input_list, index_to_prepare, index_to_wait_on):
     VIDEO_PATHS[index_to_prepare] = input_list.pop()
     VIDEO_DURATIONS[index_to_prepare] = get_media_duration(VIDEO_PATHS[index_to_prepare])
     symlink_video(VIDEO_PATHS[index_to_prepare], VIDEO_LINKS[index_to_prepare])
-    print("#########################################################################")
+    print(SECTION_BREAK)
     print("[Prepared Video]: " + str(index_to_prepare))
     print("[Source Path]: " + VIDEO_PATHS[index_to_prepare])
     print("[Linked To]: " + VIDEO_LINKS[index_to_prepare])
     print("[Duration]: " + str(VIDEO_DURATIONS[index_to_prepare]) + " seconds\n")
 
-    if (index_to_wait_on == -1):
-        print("[Skipping Wait]\n")
-        return
+    # if (index_to_wait_on == -1):
+    #     print("[Skipping Wait]\n")
+    #     return
 
-    print("[Waiting For Video]: " + str(index_to_wait_on))
-    print("[Duration]: " + str(VIDEO_DURATIONS[index_to_wait_on]))
-    print("\n")
-    sleep(VIDEO_DURATIONS[index_to_wait_on])
+    # print("[Waiting For Video]: " + str(index_to_wait_on))
+    # print("[Duration]: " + str(VIDEO_DURATIONS[index_to_wait_on]))
+    # print("\n")
+    # sleep(VIDEO_DURATIONS[index_to_wait_on])
     return
 
 
