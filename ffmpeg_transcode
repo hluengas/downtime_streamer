@@ -4,7 +4,7 @@ ENV INPUT_DIR "/tmp/content_input"
 ENV OUTPUT_DIR "/tmp/content_output"
 ENV UID "99"
 ENV GID "100"
-ENV VIDEO_ENCODER_PRESET "medium"
+ENV VIDEO_ENCODER_PRESET "slow"
 
 RUN dnf upgrade -y && \
     dnf install -y \
@@ -115,4 +115,4 @@ USER ${UID}:${GID}
 
 COPY ./transcode_content.py /tmp/transcode_content.py
 
-CMD python3 /tmp/transcode_content.py
+CMD ["python3", "-u", "/tmp/transcode_content.py"]

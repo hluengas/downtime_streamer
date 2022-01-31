@@ -6,8 +6,50 @@ from os.path import exists
 from subprocess import Popen, PIPE
 from time import sleep
 
+FFMPEG_CMD = [
+    "ffmpeg",
+    "-y",
+    "-i",
+    "INPUT_PATH",
+    "-map",
+    "0:v:0",
+    "-map",
+    "0:a:0",
+    "-map",
+    "-0:s",
+    "-map_chapters",
+    "-1",
+    "-r",
+    "24",
+    "-g",
+    "48",
+    "-c:v",
+    "libx264",
+    "-profile:v",
+    "high",
+    "-preset",
+    environ.get("VIDEO_ENCODER_PRESET"),
+    "-tune",
+    "animation",
+    "-crf",
+    "16",
+    "-vf",
+    "format=yuv420p,scale=1920:1080",
+    "-c:a",
+    "aac",
+    "-b:a",
+    "320k",
+    "-ac",
+    "2",
+    "-f",
+    "flv",
+    "OUTPUT_PATH"
+]
+
 
 def main():
+    global FFMPEG_CMD
+
     input_directory = environ.get("INPUT_DIR")
     tree_command = "tree -vnfio /tmp/tree.txt " + input_directory
 
@@ -27,46 +69,6 @@ def main():
         if path[-4:] in [".mkv", ".mp4"]:
             video_paths.append(path)
             print(path)
-
-    ffmpeg_cmd = [
-        "ffmpeg",
-        "-y",
-        "-i",
-        "INPUT_PATH",
-        "-map",
-        "0:v:0",
-        "-map",
-        "0:a:0",
-        "-map",
-        "-0:s",
-        "-map_chapters",
-        "-1",
-        "-framerate",
-        "24",
-        "-c:v",
-        "libx264",
-        "-profile:v",
-        "high",
-        "-preset",
-        environ.get("VIDEO_ENCODER_PRESET"),
-        "-tune",
-        "animation",
-        "-crf",
-        "16",
-        "-g",
-        "48",
-        "-vf",
-        "format=yuv420p,scale=1920:1080",
-        "-c:a",
-        "aac",
-        "-b:a",
-        "320k",
-        "-ac",
-        "2",
-        "-f",
-        "flv",
-        "OUTPUT_PATH"
-    ]
 
     for i, video_input_path in enumerate(video_paths):
         # set io paths
@@ -89,16 +91,16 @@ def main():
             continue
         sleep(1.0)
 
-        # set ffmpeg_cmd
-        ffmpeg_cmd[3] = video_input_path
-        ffmpeg_cmd[-1] = video_output_path_tmp
+        # set FFMPEG_CMD
+        FFMPEG_CMD[3] = video_input_path
+        FFMPEG_CMD[-1] = video_output_path_tmp
         print("FFMPEG COMMAND:")
-        print(ffmpeg_cmd)
+        print(FFMPEG_CMD)
         sleep(1.0)
 
         # transcode video into .tmp file
         print("[TRANSCODING]: " + video_output_path_tmp)
-        process = Popen(ffmpeg_cmd, stdout=PIPE)
+        process = Popen(FFMPEG_CMD, stdout=PIPE)
         _output, _error = process.communicate()
         sleep(1.0)
 
