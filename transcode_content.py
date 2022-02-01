@@ -1,10 +1,13 @@
 from http.client import PROCESSING
 from sys import exit
-from random import choice
 from os import environ
 from os.path import exists
-from subprocess import Popen, PIPE
+from subprocess import Popen, PIPE, STDOUT
 from time import sleep
+
+TREE_PATH = "/tmp/tree.txt"
+
+INPUT_DIR = environ.get("INPUT_DIR")
 
 FFMPEG_CMD = [
     "ffmpeg",
@@ -34,41 +37,27 @@ FFMPEG_CMD = [
     "-crf",
     "16",
     "-vf",
-    "format=yuv420p,scale=1920:1080",
+    "format=yuv420p,scale=1920:1080,setsar=1:1",
     "-c:a",
     "aac",
     "-b:a",
     "320k",
+    "-ar",
+    "44100",
     "-ac",
     "2",
     "-f",
     "flv",
     "OUTPUT_PATH"
 ]
+SECTION_BREAK = "#########################################################################"
 
 
 def main():
     global FFMPEG_CMD
 
-    input_directory = environ.get("INPUT_DIR")
-    tree_command = "tree -vnfio /tmp/tree.txt " + input_directory
-
-    # use the linux tree command to recursively parse the directory structure
-    process = Popen(tree_command.split(" "), stdout=PIPE)
-    _output, _error = process.communicate()
-
-    # read the tree output file into a list of video_paths
-    with open("/tmp/tree.txt") as open_file:
-        all_filenames = open_file.readlines()
-
-    # itterate through and keep only video_paths ending in mkv or mp4
-    video_paths = []
-    for file in all_filenames:
-        path = file.strip("\n")
-
-        if path[-4:] in [".mkv", ".mp4"]:
-            video_paths.append(path)
-            print(path)
+    video_paths = parse_content_directory(INPUT_DIR)
+    print(video_paths)
 
     for i, video_input_path in enumerate(video_paths):
         # set io paths
@@ -89,20 +78,17 @@ def main():
         if exists(video_output_path_flv):
             print("FILE ALREADY EXISTS, SKIPPING...")
             continue
-        sleep(1.0)
 
         # set FFMPEG_CMD
         FFMPEG_CMD[3] = video_input_path
         FFMPEG_CMD[-1] = video_output_path_tmp
         print("FFMPEG COMMAND:")
         print(FFMPEG_CMD)
-        sleep(1.0)
 
         # transcode video into .tmp file
         print("[TRANSCODING]: " + video_output_path_tmp)
-        process = Popen(FFMPEG_CMD, stdout=PIPE)
+        process = Popen(FFMPEG_CMD)
         _output, _error = process.communicate()
-        sleep(1.0)
 
         # rename .tmp file into final .flv
         print("RENAMING")
@@ -115,11 +101,36 @@ def main():
         print(rename_cmd)
         process = Popen(rename_cmd, stdout=PIPE)
         _output, _error = process.communicate()
-        sleep(1.0)
 
         # finished with episode
         print("[FINISHED]: " + video_output_path_flv)
-        sleep(1.0)
+        sleep(0.1)
+
+
+def parse_content_directory(target_dir):
+
+    # use the linux tree command to recursively parse the directory structure
+    # using flags we will discard the tree characters and keep only the files/directory paths
+    # the resulting list of all files & directoires is written to a text file
+    tree_command = "tree -afUin -P *.flv -o " + TREE_PATH + " " + target_dir
+    tree_process = Popen(tree_command.split())
+    _output, _error = tree_process.communicate()
+    print(TREE_PATH)
+    print(target_dir)
+    print(_output, _error)
+
+    # read the tree output file into a list of file paths
+    with open(TREE_PATH) as in_file:
+        all_filenames = in_file.read().splitlines()
+
+    content_list = []
+
+    # itterate through and keep only paths ending in ".flv"
+    for path in all_filenames:
+        if path[-4:] in [".flv", ".mkv", ".mp4"]:
+            content_list.append(path)
+
+    return content_list
 
 
 if __name__ == "__main__":

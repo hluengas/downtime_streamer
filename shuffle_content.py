@@ -1,12 +1,9 @@
-from pickle import NONE
 from sys import exit
-from random import choice, shuffle, sample
+from random import sample
 from os import environ
 from os.path import isfile
-from subprocess import run, Popen, PIPE, STDOUT
-from time import sleep
-from math import ceil, floor
-from datetime import datetime
+from subprocess import Popen, PIPE, STDOUT
+
 
 STREAM_ADDRESS = environ.get("STREAM_ADDRESS")
 
@@ -14,10 +11,6 @@ EPISODE_PATH = environ.get("EPISODE_DIR")
 BUMPER_PATH = environ.get("BUMPER_DIR")
 META_PATH = environ.get("META_DIR")
 
-EPISODE_META_PATH = META_PATH + "/episode_"
-BUMPER_META_PATH = META_PATH + "/bumper_"
-
-HISTORY_PATH = META_PATH + "/already_played.txt"
 PLAYLIST_PATH = META_PATH + "/ffmpeg_playlist.txt"
 TREE_PATH = META_PATH + "/tree.txt"
 
@@ -65,46 +58,50 @@ COUNTER = 0
 def main():
     global COUNTER
 
-    # get a list of paths to all available episodes
-    master_episode_list = parse_content_directory(EPISODE_PATH)
-    master_bumper_list = parse_content_directory(BUMPER_PATH)
-
-    # generate a random ordering of the epsiode list
-    shuffed_episode_list = sample(master_episode_list, len(master_episode_list))
-    shuffed_bumper_list = sample(master_bumper_list, len(master_bumper_list))
-
-    # create the swap-chain playlsit: episode_a -> bumper_a -> episode_b -> bumper_b -> ... repeat...
-    create_playlist_file()
-
-    index_playing = -1
-    index_to_prepare = 0
-    prepare_episode(shuffed_bumper_list, index_to_prepare)
-    index_to_prepare = index_to_prepare + 1
-
-    # start ffmpeg
-    ffmpeg_process = Popen(FFMPEG_CMD, stdout=PIPE, stderr=STDOUT, universal_newlines=True)
-    print(SECTION_BREAK)
-    print("[FFMPEG Started!]\n")
-
     while(True):
+        COUNTER = 0
 
-        for line in ffmpeg_process.stdout:
-            if("[flv @" in line):
-                print(SECTION_BREAK)
-                print(line, end="")
-                print("[Detected Episode Change]")
-                print("[Episode Completed]: " + str(index_playing) + "\n")
+        # get a list of paths to all available episodes
+        master_episode_list = parse_content_directory(EPISODE_PATH)
+        master_bumper_list = parse_content_directory(BUMPER_PATH)
 
-                if (index_to_prepare % 2):
-                    prepare_episode(shuffed_episode_list, index_to_prepare)
-                else:
-                    prepare_episode(shuffed_bumper_list, index_to_prepare)
+        # generate a random ordering of the epsiode list
+        shuffed_episode_list = sample(master_episode_list, len(master_episode_list))
+        shuffed_bumper_list = sample(master_bumper_list, len(master_bumper_list))
 
-                index_playing = (index_playing + 1) % 4
-                index_to_prepare = (index_to_prepare + 1) % 4
+        # create the swap-chain playlsit: episode_a -> bumper_a -> episode_b -> bumper_b -> ... repeat...
+        create_playlist_file()
 
-    # end ffmpeg
-    (_output, _error) = ffmpeg_process.communicate()
+        # prepare first video file
+        index_playing = -1
+        index_to_prepare = 0
+        prepare_episode(shuffed_episode_list, index_to_prepare)
+        index_to_prepare = index_to_prepare + 1
+
+        # start ffmpeg
+        ffmpeg_process = Popen(FFMPEG_CMD, stdout=PIPE, stderr=STDOUT, universal_newlines=True)
+        print(SECTION_BREAK)
+        print("[FFMPEG Started!]\n")
+
+        while(len(shuffed_episode_list) and len(shuffed_bumper_list)):
+
+            for line in ffmpeg_process.stdout:
+                if("[flv @" in line):
+                    print(SECTION_BREAK)
+                    print(line, end="")
+                    print("[Detected Episode Change]")
+                    print("[Episode Completed]: " + str(index_playing) + "\n")
+
+                    if (index_to_prepare % 2):
+                        prepare_episode(shuffed_bumper_list, index_to_prepare)
+                    else:
+                        prepare_episode(shuffed_episode_list, index_to_prepare)
+
+                    index_playing = (index_playing + 1) % 4
+                    index_to_prepare = (index_to_prepare + 1) % 4
+
+        # end ffmpeg
+        (_output, _error) = ffmpeg_process.communicate()
 
 
 def prepare_episode(input_list, index_to_prepare):
@@ -146,7 +143,7 @@ def get_media_duration(content_path):
     # ffprobe
     ffprobe_process = Popen(ffprobe_command, stdout=PIPE)
     (output, error) = ffprobe_process.communicate()
-    return(float(floor(float(output))))
+    return(float(output))
 
 
 # symlink episode

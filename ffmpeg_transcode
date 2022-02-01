@@ -115,4 +115,4 @@ USER ${UID}:${GID}
 
 COPY ./transcode_content.py /tmp/transcode_content.py
 
-CMD ["python3", "-u", "/tmp/transcode_content.py"]
+CMD ["python3", "/tmp/transcode_content.py"]
