@@ -2,9 +2,10 @@ FROM rockylinux:latest
 
 ENV INPUT_DIR "/tmp/content_input"
 ENV OUTPUT_DIR "/tmp/content_output"
+ENV META_DIR "/tmp/meta"
 ENV UID "99"
 ENV GID "100"
-ENV VIDEO_ENCODER_PRESET "slow"
+ENV VIDEO_ENCODER_PRESET "veryslow"
 
 RUN dnf upgrade -y && \
     dnf install -y \
@@ -115,4 +116,4 @@ USER ${UID}:${GID}
 
 COPY ./transcode_content.py /tmp/transcode_content.py
 
-CMD ["python3", "/tmp/transcode_content.py"]
+CMD ["python3", "-u", "/tmp/transcode_content.py"]
