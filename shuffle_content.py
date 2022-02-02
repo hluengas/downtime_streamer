@@ -75,7 +75,7 @@ def main():
         # prepare first video file
         index_playing = -1
         index_to_prepare = 0
-        prepare_episode(shuffed_episode_list, index_to_prepare)
+        prepare_episode(shuffed_episode_list.pop(), index_to_prepare)
         index_to_prepare = index_to_prepare + 1
 
         # start ffmpeg
@@ -93,9 +93,9 @@ def main():
                     print("[Episode Completed]: " + str(index_playing) + "\n")
 
                     if (index_to_prepare % 2):
-                        prepare_episode(shuffed_bumper_list, index_to_prepare)
+                        prepare_episode(shuffed_bumper_list.pop(), index_to_prepare)
                     else:
-                        prepare_episode(shuffed_episode_list, index_to_prepare)
+                        prepare_episode(shuffed_episode_list.pop(), index_to_prepare)
 
                     index_playing = (index_playing + 1) % 4
                     index_to_prepare = (index_to_prepare + 1) % 4
@@ -104,12 +104,12 @@ def main():
         (_output, _error) = ffmpeg_process.communicate()
 
 
-def prepare_episode(input_list, index_to_prepare):
+def prepare_episode(input_path, index_to_prepare):
     global VIDEO_DURATIONS
     global VIDEO_PATHS
     global VIDEO_LINKS
 
-    VIDEO_PATHS[index_to_prepare] = input_list.pop()
+    VIDEO_PATHS[index_to_prepare] = input_path
     VIDEO_DURATIONS[index_to_prepare] = get_media_duration(VIDEO_PATHS[index_to_prepare])
     symlink_video(VIDEO_PATHS[index_to_prepare], VIDEO_LINKS[index_to_prepare])
     print(SECTION_BREAK)
@@ -117,15 +117,6 @@ def prepare_episode(input_list, index_to_prepare):
     print("[Source Path]: " + VIDEO_PATHS[index_to_prepare])
     print("[Linked To]: " + VIDEO_LINKS[index_to_prepare])
     print("[Duration]: " + str(VIDEO_DURATIONS[index_to_prepare]) + " seconds\n")
-
-    # if (index_to_wait_on == -1):
-    #     print("[Skipping Wait]\n")
-    #     return
-
-    # print("[Waiting For Video]: " + str(index_to_wait_on))
-    # print("[Duration]: " + str(VIDEO_DURATIONS[index_to_wait_on]))
-    # print("\n")
-    # sleep(VIDEO_DURATIONS[index_to_wait_on])
     return
 
 
