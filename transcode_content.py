@@ -38,6 +38,8 @@ FFMPEG_CMD = [
     "format=yuv420p,scale=1920:1080,setsar=1:1",
     "-c:a",
     "aac",
+    "-filter:a",
+    "volume=0.5",
     "-b:a",
     "320k",
     "-ar",

@@ -3,6 +3,7 @@ from random import sample
 from os import environ
 from os.path import isfile
 from subprocess import Popen, PIPE, STDOUT
+from time import sleep
 
 
 STREAM_ADDRESS = environ.get("STREAM_ADDRESS")
@@ -101,7 +102,8 @@ def main():
                     index_to_prepare = (index_to_prepare + 1) % 4
 
         # end ffmpeg
-        (_output, _error) = ffmpeg_process.communicate()
+        sleep(get_media_duration(VIDEO_PATHS[index_playing]) + get_media_duration(VIDEO_PATHS[index_to_prepare]))
+        ffmpeg_process.terminate()
 
 
 def prepare_episode(input_path, index_to_prepare):
