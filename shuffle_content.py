@@ -178,7 +178,7 @@ def parse_content_directory(target_dir, use_white_list=False):
 
             # use whitelist to filter results
             if (use_white_list):
-                for series in JPN_LANG_LIST:
+                for series in SERIES_WHITE_LIST:
                     if series in path:
                         content_list.append(path)
             else:
