@@ -4,6 +4,7 @@ ENV STREAM_ADDRESS "rtmp://address:port/live/stream_key"
 ENV EPISODE_DIR "/tmp/content/episodes"
 ENV BUMPER_DIR "/tmp/content/bumpers"
 ENV META_DIR "/tmp/content/meta"
+ENV VIDEO_ENCODER_PRESET "veryfast"
 ENV UID "99"
 ENV GID "100"
 
@@ -115,5 +116,6 @@ RUN cd /ffmpeg_sources && \
 USER ${UID}:${GID}
 
 COPY ./shuffle_content.py /tmp/meta/shuffle_content.py
+COPY ./constants.py /tmp/meta/constants.py
 
 CMD ["python3", "-u", "/tmp/meta/shuffle_content.py"]

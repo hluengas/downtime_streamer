@@ -1,189 +1,190 @@
-from sys import exit
+from cgitb import text
+from sys import exit, stderr, stdout
 from random import sample
-from os import environ
 from os.path import isfile
 from subprocess import Popen, PIPE, STDOUT
 from time import sleep
-
-
-STREAM_ADDRESS = environ.get("STREAM_ADDRESS")
-
-EPISODE_PATH = environ.get("EPISODE_DIR")
-BUMPER_PATH = environ.get("BUMPER_DIR")
-META_PATH = environ.get("META_DIR")
-
-PLAYLIST_PATH = META_PATH + "/ffmpeg_playlist.txt"
-TREE_PATH = META_PATH + "/tree.txt"
-
-SECTION_BREAK = "#########################################################################"
-
-FFMPEG_CMD = [
-    "ffmpeg",
-    "-f",
-    "concat",
-    "-safe",
-    "0",
-    "-re",
-    "-stream_loop",
-    "-1",
-    "-i",
-    PLAYLIST_PATH,
-    "-c",
-    "copy",
-    "-f",
-    "flv",
-    STREAM_ADDRESS
-]
-PLAYLIST = [
-    "file \'" + META_PATH + "/video_0.flv\'\n",
-    "file \'" + META_PATH + "/video_1.flv\'\n",
-    "file \'" + META_PATH + "/video_2.flv\'\n",
-    "file \'" + META_PATH + "/video_3.flv\'\n"
-]
-VIDEO_DURATIONS = [0, 0, 0, 0]
-VIDEO_PATHS = [
-    "/tmp/content/episodes",
-    "/tmp/content/episodes",
-    "/tmp/content/episodes",
-    "/tmp/content/episodes",
-]
-VIDEO_LINKS = [
-    META_PATH + "/video_0.flv",
-    META_PATH + "/video_1.flv",
-    META_PATH + "/video_2.flv",
-    META_PATH + "/video_3.flv",
-]
-COUNTER = 0
+from constants import *
 
 
 def main():
-    global COUNTER
 
-    while(True):
-        COUNTER = 0
+    # get a list of paths to all available episodes
+    master_episode_list = parse_content_directory(EPISODE_PATH, use_white_list=True)
+    master_bumper_list = parse_content_directory(BUMPER_PATH)
 
-        # get a list of paths to all available episodes
-        master_episode_list = parse_content_directory(EPISODE_PATH)
-        master_bumper_list = parse_content_directory(BUMPER_PATH)
+    # generate a random ordering of the epsiode list
+    shuffed_episode_list = sample(master_episode_list, len(master_episode_list))
+    shuffed_bumper_list = sample(master_bumper_list, len(master_bumper_list))
 
-        # generate a random ordering of the epsiode list
-        shuffed_episode_list = sample(master_episode_list, len(master_episode_list))
-        shuffed_bumper_list = sample(master_bumper_list, len(master_bumper_list))
+    # create the swap-chain playlsit: episode_a -> bumper_a -> episode_b -> bumper_b -> ... repeat...
+    create_playlist_file(PLAYLIST, PLAYLIST_PATH)
 
-        # create the swap-chain playlsit: episode_a -> bumper_a -> episode_b -> bumper_b -> ... repeat...
-        create_playlist_file()
+    # prepare first video file
+    index_playing = -1
+    index_to_prepare = 0
+    prepare_video(shuffed_episode_list.pop(), index_to_prepare, is_bumper=False)
+    index_to_prepare = index_to_prepare + 1
 
-        # prepare first video file
-        index_playing = -1
-        index_to_prepare = 0
-        prepare_episode(shuffed_episode_list.pop(), index_to_prepare)
-        index_to_prepare = index_to_prepare + 1
+    # prepare second video file
+    prepare_video(shuffed_bumper_list.pop(), index_to_prepare, is_bumper=True)
+    index_to_prepare = index_to_prepare + 1
 
-        # start ffmpeg
-        ffmpeg_process = Popen(FFMPEG_CMD, stdout=PIPE, stderr=STDOUT, universal_newlines=True)
-        print(SECTION_BREAK)
-        print("[FFMPEG Started!]\n")
+    # start ffmpeg
+    ffmpeg_stream_process = Popen(FFMPEG_STREAM_CMD, stdout=PIPE, stderr=STDOUT, universal_newlines=True)
+    print(SECTION_BREAK)
+    print("[FFMPEG Started!]\n")
 
-        while(len(shuffed_episode_list) and len(shuffed_bumper_list)):
+    playlist_video_durations = [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+    ]
 
-            for line in ffmpeg_process.stdout:
-                if("[flv @" in line):
-                    print(SECTION_BREAK)
-                    print(line, end="")
-                    print("[Detected Episode Change]")
-                    print("[Episode Completed]: " + str(index_playing) + "\n")
+    # while there is still content
+    while(len(shuffed_episode_list) and len(shuffed_bumper_list)):
 
-                    if (index_to_prepare % 2):
-                        prepare_episode(shuffed_bumper_list.pop(), index_to_prepare)
-                    else:
-                        prepare_episode(shuffed_episode_list.pop(), index_to_prepare)
+        # read ffmpeg stream debug output
+        for line in ffmpeg_stream_process.stdout:
 
-                    index_playing = (index_playing + 1) % 4
-                    index_to_prepare = (index_to_prepare + 1) % 4
+            # lines starting with "flv @" indicate the muxer has transitioned videos
+            if("[flv @" in line):
 
-        # end ffmpeg
-        sleep(get_media_duration(VIDEO_PATHS[index_playing]) + get_media_duration(VIDEO_PATHS[index_to_prepare]))
-        ffmpeg_process.terminate()
+                # print debug
+                print(SECTION_BREAK)
+                print(line, end="")
+                print("[Detected Episode Change]")
+                print("[Episode Completed]: " + str(index_playing) + "\n")
+
+                # choose between episode and bumper
+                # then start the transcoding process to prep the video
+                if (index_to_prepare % 2):
+                    playlist_video_durations[index_to_prepare] = prepare_video(shuffed_bumper_list.pop(), index_to_prepare, is_bumper=False)
+                else:
+                    playlist_video_durations[index_to_prepare] = prepare_video(shuffed_episode_list.pop(), index_to_prepare, is_bumper=True)
+
+                # increment counters
+                index_playing = (index_playing + 1) % 4
+                index_to_prepare = (index_to_prepare + 1) % 4
+
+    # wait for prepared epsiodes to finish
+    sleep(playlist_video_durations[index_playing] + playlist_video_durations[index_to_prepare])
+    # terminate FFMPEG to stop it looping
+    ffmpeg_stream_process.terminate()
 
 
-def prepare_episode(input_path, index_to_prepare):
-    global VIDEO_DURATIONS
-    global VIDEO_PATHS
-    global VIDEO_LINKS
+# transcode the desired video, then
+# symlink the output video to the desired link in the playlist swap-chain
+def prepare_video(video_path, index_to_prepare, is_bumper=False):
 
-    VIDEO_PATHS[index_to_prepare] = input_path
-    VIDEO_DURATIONS[index_to_prepare] = get_media_duration(VIDEO_PATHS[index_to_prepare])
-    symlink_video(VIDEO_PATHS[index_to_prepare], VIDEO_LINKS[index_to_prepare])
+    # get the duration of the video file
+    video_duration = get_media_duration(video_path)
+
+    # symlink the desired video to the desired link in the playlist swap-chain
+    transcode_video(video_path, PLAYLIST_VIDEO_PATHS[index_to_prepare], is_bumper)
+
+    # print debug info
     print(SECTION_BREAK)
     print("[Prepared Video]: " + str(index_to_prepare))
-    print("[Source Path]: " + VIDEO_PATHS[index_to_prepare])
-    print("[Linked To]: " + VIDEO_LINKS[index_to_prepare])
-    print("[Duration]: " + str(VIDEO_DURATIONS[index_to_prepare]) + " seconds\n")
-    return
+    print("[Source Path]: " + video_path)
+    print("[Transcoded To]: " + PLAYLIST_VIDEO_PATHS[index_to_prepare])
+    print("[Duration]: " + str(video_duration) + " seconds\n")
+
+    return video_duration
 
 
+# get the duration in seconds of the video at the given path
 def get_media_duration(content_path):
-    ffprobe_command = [
-        "ffprobe",
-        "-v",
-        "error",
-        "-show_entries",
-        "format=duration",
-        "-of",
-        "default=noprint_wrappers=1:nokey=1",
-        content_path
-    ]
-    # ffprobe
+
+    # the FFPROBE command is tuned to only output the duration of the media in seconds
+    # duplicate the command and append the desired path
+    ffprobe_command = FFPROBE_CMD.copy().append(content_path)
+
+    # run FFPROBE
     ffprobe_process = Popen(ffprobe_command, stdout=PIPE)
-    (output, error) = ffprobe_process.communicate()
+    (output, _error) = ffprobe_process.communicate()
     return(float(output))
 
 
-# symlink episode
-def symlink_video(episode_path, episode_link):
+# link the video at "episode_path" to the symbolic link at link_path"
+def symlink_video(episode_path, link_path):
+
+    # create link command
+    # -s for soft/symbolic link
+    # -f to force, overwriting existing symlinks
     link_command = [
         "ln",
         "-sf",
         episode_path,
-        episode_link,
+        link_path,
     ]
+
+    # link episode
     link_process = Popen(link_command, stdout=PIPE)
     _output, _error = link_process.communicate()
 
 
-def parse_content_directory(target_dir):
+def transcode_video(episode_input_path, episode_output_path, is_bumper=False):
 
-    # use the linux tree command to recursively parse the directory structure
+    # choose ffmpeg parameters for episode vs bumpers
+    if (is_bumper):
+        ffmpeg_command = FFMPEG_TRANSCODE_BUMPER_CMD.copy()
+    else:
+        ffmpeg_command = FFMPEG_TRANSCODE_EPISODE_CMD.copy()
+
+    # set input & output paths
+    ffmpeg_command[3] = episode_input_path
+    ffmpeg_command.append(episode_output_path)
+
+    # start ffmpeg
+    print("[Transcoding Started]\n")
+    ffmpeg_process = Popen(ffmpeg_command, stdout=PIPE, stderr=STDOUT, universal_newlines=True)
+
+
+# get a list of paths to video content under a given target directory
+def parse_content_directory(target_dir, use_white_list=False):
+
+    # create the linux tree command to recursively parse the directory structure
     # using flags we will discard the tree characters and keep only the files/directory paths
-    # the resulting list of all files & directoires is written to a text file
-    tree_command = "tree -afUin -P *.flv -o " + TREE_PATH + " " + target_dir
-    tree_process = Popen(tree_command.split(), stdout=PIPE)
-    _output, _error = tree_process.communicate()
+    tree_command = [
+        "tree",
+        "-afUin",
+        target_dir
+    ]
 
-    # read the tree output file into a list of file paths
-    with open(TREE_PATH) as in_file:
-        all_filenames = in_file.read().splitlines()
+    # run tree command
+    tree_process = Popen(tree_command, stdout=PIPE, universal_newlines=True)
+    (output, _error) = tree_process.communicate()
 
+    # itterate through and keep only paths ending in ".mp4", ".mkv", or ".flv"
     content_list = []
+    for path in output.splitlines():
+        if path[-4:] in [".mp4", ".mkv", ".flv"]:
 
-    # itterate through and keep only paths ending in ".flv"
-    for path in all_filenames:
-        if path[-4:] == ".flv":
-            content_list.append(path)
+            # use whitelist to filter results
+            if (use_white_list):
+                for series in SERIES_WHITE_LIST:
+                    if series in path:
+                        content_list.append(path)
+            else:
+                content_list.append(path)
 
     return content_list
 
 
-def create_playlist_file():
+# create the swap-chain playlsit: episode_a -> bumper_a -> episode_b -> bumper_b -> ... repeat...
+def create_playlist_file(playlist, playlist_path):
+
     # check if the playlist file exists
-    if (not isfile(PLAYLIST_PATH)):
+    if (not isfile(playlist_path)):
         # if not create it
-        touch_process = Popen(["touch", PLAYLIST_PATH], stdout=PIPE)
+        touch_process = Popen(["touch", playlist_path], stdout=PIPE)
         touch_process.communicate()
 
     # write the ffmpeg_playlist to its file
-    with open(PLAYLIST_PATH, 'w') as playlist_out_file:
-        playlist_out_file.write("".join(PLAYLIST))
+    with open(playlist_path, 'w') as playlist_out_file:
+        playlist_out_file.write("".join(playlist))
 
 
 if __name__ == "__main__":
