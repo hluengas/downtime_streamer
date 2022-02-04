@@ -3,7 +3,7 @@ from sys import exit, stderr, stdout
 from random import sample
 from os.path import isfile
 from subprocess import Popen, PIPE, STDOUT
-from time import sleep
+from time import time, sleep
 from constants import *
 
 
@@ -19,15 +19,29 @@ def main():
 
     # create the swap-chain playlsit: episode_a -> bumper_a -> episode_b -> bumper_b -> ... repeat...
     create_playlist_file(PLAYLIST, PLAYLIST_PATH)
+    # list used to keep track of the durations of the four videos in the playlist
+    playlist_video_durations = [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+    ]
+    # list used to keep track of the durations of the four videos in the playlist
+    playlist_video_start_times = [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+    ]
 
     # prepare first video file
-    index_playing = -1
+    index_playing = 0
     index_to_prepare = 0
-    prepare_video(shuffed_episode_list.pop(), index_to_prepare, is_bumper=False, is_blocking=True)
+    (playlist_video_start_times[index_to_prepare], playlist_video_durations[index_to_prepare]) = prepare_video(shuffed_episode_list.pop(), index_to_prepare, is_bumper=False, is_blocking=True)
     index_to_prepare = index_to_prepare + 1
 
     # prepare second video file
-    prepare_video(shuffed_bumper_list.pop(), index_to_prepare, is_bumper=True, is_blocking=True)
+    (playlist_video_start_times[index_to_prepare], playlist_video_durations[index_to_prepare]) = prepare_video(shuffed_bumper_list.pop(), index_to_prepare, is_bumper=True, is_blocking=True)
     index_to_prepare = index_to_prepare + 1
 
     # start ffmpeg
@@ -36,17 +50,10 @@ def main():
     print("[Stream Started!]\n")
 
     # prepare third video file
-    prepare_video(shuffed_episode_list.pop(), index_to_prepare, is_bumper=False, is_blocking=False)
+    (playlist_video_start_times[index_to_prepare], playlist_video_durations[index_to_prepare]) = prepare_video(shuffed_episode_list.pop(), index_to_prepare, is_bumper=False, is_blocking=False)
     index_to_prepare = index_to_prepare + 1
 
-    # list used to keep track of the durations of the four videos in the playlist
-    playlist_video_durations = [
-        0.0,
-        0.0,
-        0.0,
-        0.0,
-    ]
-
+    
     # while there is still content
     while(len(shuffed_episode_list) and len(shuffed_bumper_list)):
 
@@ -65,9 +72,30 @@ def main():
                 # choose between episode and bumper
                 # then start the transcoding process to prep the video
                 if (index_to_prepare % 2):
-                    playlist_video_durations[index_to_prepare] = prepare_video(shuffed_bumper_list.pop(), index_to_prepare, is_bumper=False)
+                    (playlist_video_start_times[index_to_prepare], playlist_video_durations[index_to_prepare]) = prepare_video(shuffed_bumper_list.pop(), index_to_prepare, is_bumper=False)
                 else:
-                    playlist_video_durations[index_to_prepare] = prepare_video(shuffed_episode_list.pop(), index_to_prepare, is_bumper=True)
+                    (playlist_video_start_times[index_to_prepare], playlist_video_durations[index_to_prepare]) = prepare_video(shuffed_episode_list.pop(), index_to_prepare, is_bumper=True)
+
+                # increment counters
+                index_playing = (index_playing + 1) % 4
+                index_to_prepare = (index_to_prepare + 1) % 4
+
+            # check based on video duration as a fall back
+            video_duration_elapsed = (time() > (playlist_video_start_times[index_playing] + playlist_video_durations[index_playing] + 15.0))
+            if(video_duration_elapsed):
+
+                # print debug
+                print(SECTION_BREAK)
+                print("[Failed To Detect Episode Change]")
+                print("[Duration Fail Safe Triggered]")
+                print("[Episode Completed]: " + str(index_playing) + "\n")
+
+                # choose between episode and bumper
+                # then start the transcoding process to prep the video
+                if (index_to_prepare % 2):
+                    (playlist_video_start_times[index_to_prepare], playlist_video_durations[index_to_prepare]) = prepare_video(shuffed_bumper_list.pop(), index_to_prepare, is_bumper=False)
+                else:
+                    (playlist_video_start_times[index_to_prepare], playlist_video_durations[index_to_prepare]) = prepare_video(shuffed_episode_list.pop(), index_to_prepare, is_bumper=True)
 
                 # increment counters
                 index_playing = (index_playing + 1) % 4
@@ -94,9 +122,10 @@ def prepare_video(video_path, index_to_prepare, is_bumper=False, is_blocking=Fal
     print("[Duration]: " + str(video_duration) + " seconds\n")
 
     # transcode the desired video to the desired output video in the playlist swap-chain
-    transcode_video(video_path, PLAYLIST_VIDEO_PATHS[index_to_prepare], is_bumper, is_blocking)
+    start_time = time()
+    transcode_video(video_path, index_to_prepare, is_bumper, is_blocking)
 
-    return video_duration
+    return (start_time, video_duration)
 
 
 # get the duration in seconds of the video at the given path
@@ -131,20 +160,15 @@ def symlink_video(episode_path, link_path):
     (_output, _error) = link_process.communicate()
 
 
-def transcode_video(episode_input_path, episode_output_path, is_bumper=False, is_blocking=False):
-
+def transcode_video(episode_input_path, index_to_prepare, is_bumper=False, is_blocking=False):
+    
+    episode_output_path = PLAYLIST_VIDEO_PATHS[index_to_prepare]
+    
     # choose ffmpeg parameters for episode vs bumpers
     if (is_bumper):
         ffmpeg_command = FFMPEG_TRANSCODE_BUMPER_CMD.copy()
     else:
         ffmpeg_command = FFMPEG_TRANSCODE_EPISODE_CMD.copy()
-
-    # # choose eng vs jpn language path
-    # if (use_jpn_lang):
-    #     ffmpeg_command = FFMPEG_TRANSCODE_JPN_EPISODE_CMD.copy()
-    #     # ffmpeg_command[27] = str(ffmpeg_command[27]).replace("subtitles=video.mkv", ("subtitles=" + str(episode_input_path)))
-    # else:
-    #     ffmpeg_command = FFMPEG_TRANSCODE_EPISODE_CMD.copy()
 
     # set input & output paths
     ffmpeg_command[3] = episode_input_path
@@ -159,6 +183,7 @@ def transcode_video(episode_input_path, episode_output_path, is_bumper=False, is
         (_output, _error) = ffmpeg_process.communicate()
     else:
         print("[Transcoding In Background]")
+        print("[Waiting For Video]: " + str(index_to_prepare - 2))
 
 
 # get a list of paths to video content under a given target directory
