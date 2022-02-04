@@ -49,7 +49,7 @@ def main():
         for line in ffmpeg_stream_process.stdout:
 
             # lines starting with "flv @" indicate the muxer has transitioned videos
-            if("[flv @" in line):
+            if(("[flv @" in line) and "Auto-inserting" in line):
 
                 # print debug
                 print(SECTION_BREAK)
