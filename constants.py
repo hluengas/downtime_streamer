@@ -124,7 +124,7 @@ FFMPEG_TRANSCODE_EPISODE_CMD = [
     "-crf",
     "16",
     "-vf",
-    "format=yuv420p,scale=1920:1080:force_original_aspect_ratio=decrease,pad=1920:1080:-1:-1:color=black,setsar=1:1",
+    "fieldmatch,yadif=deint=interlaced,decimate,format=yuv420p,scale=1920:1080:force_original_aspect_ratio=decrease,pad=1920:1080:-1:-1:color=black,setsar=1:1",
     "-c:a",
     "aac",
     "-filter:a",
