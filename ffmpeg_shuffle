@@ -4,7 +4,7 @@ ENV STREAM_ADDRESS "rtmp://address:port/live/stream_key"
 ENV EPISODE_DIR "/tmp/content/episodes"
 ENV BUMPER_DIR "/tmp/content/bumpers"
 ENV META_DIR "/tmp/content/meta"
-ENV VIDEO_ENCODER_PRESET "veryfast"
+ENV VIDEO_ENCODER_PRESET "fast"
 ENV UID "99"
 ENV GID "100"
 
