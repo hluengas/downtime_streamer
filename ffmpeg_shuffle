@@ -1,14 +1,10 @@
-FROM rockylinux:latest
+FROM rockylinux:latest as BUILD
 
-ENV STREAM_ADDRESS "rtmp://address:port/live/stream_key"
-ENV EPISODE_DIR "/tmp/content/episodes"
-ENV BUMPER_DIR "/tmp/content/bumpers"
-ENV META_DIR "/tmp/content/meta"
-ENV VIDEO_ENCODER_PRESET "fast"
-ENV UID "99"
-ENV GID "100"
-
-RUN dnf upgrade -y && \
+RUN dnf install -y https://dl.fedoraproject.org/pub/epel/epel-release-latest-8.noarch.rpm && \
+    dnf install -y https://mirrors.rpmfusion.org/free/el/rpmfusion-free-release-8.noarch.rpm && \
+    dnf install -y https://mirrors.rpmfusion.org/nonfree/el/rpmfusion-nonfree-release-8.noarch.rpm && \
+    dnf install -y dnf-plugins-core && \
+    dnf upgrade -y && \
     dnf install -y \
     autoconf \
     automake \
@@ -19,6 +15,7 @@ RUN dnf upgrade -y && \
     gcc \
     gcc-c++ \
     git \
+    libass-devel \
     libtool \
     make \
     pkgconfig \
@@ -47,7 +44,7 @@ RUN cd /ffmpeg_sources && \
 RUN cd /ffmpeg_sources && \
     git clone --branch stable --depth 1 https://code.videolan.org/videolan/x264.git && \
     cd x264 && \
-    PKG_CONFIG_PATH="/tmp/ffmpeg_build/lib/pkgconfig" ./configure --prefix="/tmp/ffmpeg_build" --bindir="/bin" --enable-static && \
+    PKG_CONFIG_PATH="/tmp/ffmpeg_build/lib/pkgconfig" ./configure --prefix="/tmp/ffmpeg_build" --bindir="/tmp/bin" --enable-static && \
     make -j 24 && \
     make install
 
@@ -70,7 +67,7 @@ RUN cd /ffmpeg_sources && \
     curl -O -L https://downloads.sourceforge.net/project/lame/lame/3.100/lame-3.100.tar.gz && \
     tar xzvf lame-3.100.tar.gz && \
     cd lame-3.100 && \
-    ./configure --prefix="/tmp/ffmpeg_build" --bindir="/bin" --disable-shared --enable-nasm && \
+    ./configure --prefix="/tmp/ffmpeg_build" --bindir="/tmp/bin" --disable-shared --enable-nasm && \
     make -j 24 && \
     make install
 
@@ -90,9 +87,9 @@ RUN cd /ffmpeg_sources && \
     make install
 
 RUN cd /ffmpeg_sources && \
-    curl -O -L https://ffmpeg.org/releases/ffmpeg-snapshot.tar.bz2 && \
-    tar xjvf ffmpeg-snapshot.tar.bz2 && \
-    cd ffmpeg && \
+    curl -O -L https://ffmpeg.org/releases/ffmpeg-5.0.tar.bz2 && \
+    tar xjvf ffmpeg-5.0.tar.bz2 && \
+    cd ffmpeg-5.0 && \
     PATH="/bin" PKG_CONFIG_PATH="/tmp/ffmpeg_build/lib/pkgconfig" ./configure \
     --prefix="/tmp/ffmpeg_build" \
     --pkg-config-flags="--static" \
@@ -100,7 +97,7 @@ RUN cd /ffmpeg_sources && \
     --extra-ldflags="-L/tmp/ffmpeg_build/lib" \
     --extra-libs=-lpthread \
     --extra-libs=-lm \
-    --bindir="/bin" \
+    --bindir="/tmp/bin" \
     --enable-gpl \
     --enable-libfdk_aac \
     --enable-libfreetype \
@@ -109,13 +106,38 @@ RUN cd /ffmpeg_sources && \
     --enable-libvpx \
     --enable-libx264 \
     --enable-libx265 \
+    --enable-libass \
     --enable-nonfree && \
     make -j 24 && \
     make install
+
+FROM rockylinux:latest
+
+ENV STREAM_ADDRESS "rtmp://address:port/live/stream_key"
+ENV EPISODE_DIR "/tmp/content/episodes"
+ENV BUMPER_DIR "/tmp/content/bumpers"
+ENV META_DIR "/tmp/content/meta"
+ENV VIDEO_ENCODER_PRESET "veryfast"
+ENV UID "99"
+ENV GID "100"
+
+RUN dnf install -y https://dl.fedoraproject.org/pub/epel/epel-release-latest-8.noarch.rpm && \
+    dnf install -y https://mirrors.rpmfusion.org/free/el/rpmfusion-free-release-8.noarch.rpm && \
+    dnf install -y https://mirrors.rpmfusion.org/nonfree/el/rpmfusion-nonfree-release-8.noarch.rpm && \
+    dnf install -y dnf-plugins-core && \
+    dnf upgrade -y && \
+    dnf install -y \
+    libass \
+    python3 \
+    tree
+
+# Copy Binary From Build Stage
+COPY --from=0 /tmp/bin /usr/bin
 
 USER ${UID}:${GID}
 
 COPY ./shuffle_content.py /tmp/meta/shuffle_content.py
 COPY ./constants.py /tmp/meta/constants.py
+
 
 CMD ["python3", "-u", "/tmp/meta/shuffle_content.py"]

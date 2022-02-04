@@ -33,7 +33,7 @@ def main():
     # start ffmpeg
     ffmpeg_stream_process = Popen(FFMPEG_STREAM_CMD, stdout=PIPE, stderr=STDOUT, universal_newlines=True)
     print(SECTION_BREAK)
-    print("[FFMPEG Started!]\n")
+    print("[Stream Started!]\n")
 
     playlist_video_durations = [
         0.0,
@@ -48,8 +48,8 @@ def main():
         # read ffmpeg stream debug output
         for line in ffmpeg_stream_process.stdout:
 
-            # lines starting with "flv @" indicate the muxer has transitioned videos
-            if(("[flv @" in line) and "Auto-inserting" in line):
+            # lines with "Statistics:" indicate the muxer has transitioned videos
+            if("Statistics:" in line):
 
                 # print debug
                 print(SECTION_BREAK)
@@ -88,7 +88,7 @@ def prepare_video(video_path, index_to_prepare, is_bumper=False, is_blocking=Fal
     print("[Transcoding To]: " + PLAYLIST_VIDEO_PATHS[index_to_prepare])
     print("[Duration]: " + str(video_duration) + " seconds\n")
 
-    # symlink the desired video to the desired link in the playlist swap-chain
+    # transcode the desired video to the desired output video in the playlist swap-chain
     transcode_video(video_path, PLAYLIST_VIDEO_PATHS[index_to_prepare], is_bumper, is_blocking)
 
     return video_duration
@@ -134,6 +134,13 @@ def transcode_video(episode_input_path, episode_output_path, is_bumper=False, is
     else:
         ffmpeg_command = FFMPEG_TRANSCODE_EPISODE_CMD.copy()
 
+    # # choose eng vs jpn language path
+    # if (use_jpn_lang):
+    #     ffmpeg_command = FFMPEG_TRANSCODE_JPN_EPISODE_CMD.copy()
+    #     # ffmpeg_command[27] = str(ffmpeg_command[27]).replace("subtitles=video.mkv", ("subtitles=" + str(episode_input_path)))
+    # else:
+    #     ffmpeg_command = FFMPEG_TRANSCODE_EPISODE_CMD.copy()
+
     # set input & output paths
     ffmpeg_command[3] = episode_input_path
     ffmpeg_command.append(episode_output_path)
@@ -171,7 +178,7 @@ def parse_content_directory(target_dir, use_white_list=False):
 
             # use whitelist to filter results
             if (use_white_list):
-                for series in SERIES_WHITE_LIST:
+                for series in JPN_LANG_LIST:
                     if series in path:
                         content_list.append(path)
             else:

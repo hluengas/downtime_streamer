@@ -18,6 +18,13 @@ PLAYLIST_VIDEO_PATHS = [
     META_PATH + "/video_3.flv",
 ]
 
+SOURCE_LINK_PATHS = [
+    META_PATH + "/link_0",
+    META_PATH + "/link_1",
+    META_PATH + "/link_2",
+    META_PATH + "/link_3",
+]
+
 PLAYLIST = [
     "file \'" + PLAYLIST_VIDEO_PATHS[0] + "\'\n",
     "file \'" + PLAYLIST_VIDEO_PATHS[1] + "\'\n",
@@ -26,14 +33,14 @@ PLAYLIST = [
 ]
 
 FFPROBE_CMD = [
-        "ffprobe",
-        "-v",
-        "error",
-        "-show_entries",
-        "format=duration",
-        "-of",
-        "default=noprint_wrappers=1:nokey=1",
-    ]
+    "ffprobe",
+    "-v",
+    "error",
+    "-show_entries",
+    "format=duration",
+    "-of",
+    "default=noprint_wrappers=1:nokey=1",
+]
 
 FFMPEG_STREAM_CMD = [
     "ffmpeg",
@@ -46,6 +53,8 @@ FFMPEG_STREAM_CMD = [
     "-1",
     "-i",
     PLAYLIST_PATH,
+    "-loglevel",
+    "verbose",
     "-c",
     "copy",
     "-f",
@@ -145,7 +154,7 @@ FFMPEG_TRANSCODE_JPN_EPISODE_CMD = [
     "-map",
     "0:v:0",
     "-map",
-    "0:a:0",
+    "0:m:language:jpn",
     "-map",
     "-0:s",
     "-map_chapters",
@@ -164,8 +173,8 @@ FFMPEG_TRANSCODE_JPN_EPISODE_CMD = [
     "animation",
     "-crf",
     "16",
-    "-vf",
-    "format=yuv420p,scale=1920:1080:force_original_aspect_ratio=decrease,pad=1920:1080:-1:-1:color=black,setsar=1:1",
+    "-filter_complex",
+    "[0:v][0:s]overlay[v],format=yuv420p,scale=1920:1080:force_original_aspect_ratio=decrease,pad=1920:1080:-1:-1:color=black,setsar=1:1",
     "-c:a",
     "aac",
     "-b:a",
@@ -178,31 +187,32 @@ FFMPEG_TRANSCODE_JPN_EPISODE_CMD = [
     "flv",
 ]
 
-
-
 SERIES_WHITE_LIST = [
     "over.the.garden.wall",
     "archer.2009",
     "primal",
     "rick.and.morty",
     "avatar.the.last.airbender",
-    "samurai.champloo",
     "Batman.The.Animated.Series",
     "samurai.jack",
     "scooby.doo.where.are.you",
     "solar.opposites",
     "south.park",
     "brickleberry",
-    "dragon.ball",
     "gravity.falls",
     "justice.league",
     "justice.league.unlimeted",
-    "one.punch.man",
-    "cowboy.bebop",
     "futurama",
     "harvey.birdman.atorney.at.law",
     "king.of.the.hill",
     "star.trek.lower.decks",
     "star.wars.the.clone.wars",
     "what.if",
+]
+
+JPN_LANG_LIST = [
+    "samurai.champloo",
+    "dragon.ball",
+    "one.punch.man",
+    "cowboy.bebop",
 ]
