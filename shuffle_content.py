@@ -23,11 +23,11 @@ def main():
     # prepare first video file
     index_playing = -1
     index_to_prepare = 0
-    prepare_video(shuffed_episode_list.pop(), index_to_prepare, is_bumper=False)
+    prepare_video(shuffed_episode_list.pop(), index_to_prepare, is_bumper=False, is_blocking=True)
     index_to_prepare = index_to_prepare + 1
 
     # prepare second video file
-    prepare_video(shuffed_bumper_list.pop(), index_to_prepare, is_bumper=True)
+    prepare_video(shuffed_bumper_list.pop(), index_to_prepare, is_bumper=True, is_blocking=True)
     index_to_prepare = index_to_prepare + 1
 
     # start ffmpeg
@@ -76,20 +76,20 @@ def main():
 
 # transcode the desired video, then
 # symlink the output video to the desired link in the playlist swap-chain
-def prepare_video(video_path, index_to_prepare, is_bumper=False):
+def prepare_video(video_path, index_to_prepare, is_bumper=False, is_blocking=False):
 
     # get the duration of the video file
     video_duration = get_media_duration(video_path)
 
-    # symlink the desired video to the desired link in the playlist swap-chain
-    transcode_video(video_path, PLAYLIST_VIDEO_PATHS[index_to_prepare], is_bumper)
-
     # print debug info
     print(SECTION_BREAK)
-    print("[Prepared Video]: " + str(index_to_prepare))
+    print("[Preparing Video]: " + str(index_to_prepare))
     print("[Source Path]: " + video_path)
-    print("[Transcoded To]: " + PLAYLIST_VIDEO_PATHS[index_to_prepare])
+    print("[Transcoding To]: " + PLAYLIST_VIDEO_PATHS[index_to_prepare])
     print("[Duration]: " + str(video_duration) + " seconds\n")
+
+    # symlink the desired video to the desired link in the playlist swap-chain
+    transcode_video(video_path, PLAYLIST_VIDEO_PATHS[index_to_prepare], is_bumper, is_blocking)
 
     return video_duration
 
@@ -99,7 +99,8 @@ def get_media_duration(content_path):
 
     # the FFPROBE command is tuned to only output the duration of the media in seconds
     # duplicate the command and append the desired path
-    ffprobe_command = FFPROBE_CMD.copy().append(content_path)
+    ffprobe_command = FFPROBE_CMD.copy()
+    ffprobe_command.append(content_path)
 
     # run FFPROBE
     ffprobe_process = Popen(ffprobe_command, stdout=PIPE)
@@ -122,10 +123,10 @@ def symlink_video(episode_path, link_path):
 
     # link episode
     link_process = Popen(link_command, stdout=PIPE)
-    _output, _error = link_process.communicate()
+    (_output, _error) = link_process.communicate()
 
 
-def transcode_video(episode_input_path, episode_output_path, is_bumper=False):
+def transcode_video(episode_input_path, episode_output_path, is_bumper=False, is_blocking=False):
 
     # choose ffmpeg parameters for episode vs bumpers
     if (is_bumper):
@@ -138,8 +139,14 @@ def transcode_video(episode_input_path, episode_output_path, is_bumper=False):
     ffmpeg_command.append(episode_output_path)
 
     # start ffmpeg
-    print("[Transcoding Started]\n")
     ffmpeg_process = Popen(ffmpeg_command, stdout=PIPE, stderr=STDOUT, universal_newlines=True)
+
+    # this flag is used to halt the script until the video has finished transcoding
+    if (is_blocking):
+        print("[Waiting For Transcoding To Finish]\n")
+        (_output, _error) = ffmpeg_process.communicate()
+    else:
+        print("[Transcoding In Background]")
 
 
 # get a list of paths to video content under a given target directory

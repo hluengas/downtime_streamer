@@ -159,4 +159,11 @@ SERIES_WHITE_LIST = [
     "justice.league",
     "justice.league.unlimeted",
     "one.punch.man",
+    "cowboy.bebop",
+    "futurama",
+    "harvey.birdman.atorney.at.law",
+    "king.of.the.hill",
+    "star.trek.lower.decks",
+    "star.wars.the.clone.wars",
+    "what.if",
 ]
