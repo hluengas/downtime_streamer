@@ -35,6 +35,11 @@ def main():
     print(SECTION_BREAK)
     print("[Stream Started!]\n")
 
+    # prepare third video file
+    prepare_video(shuffed_episode_list.pop(), index_to_prepare, is_bumper=False, is_blocking=False)
+    index_to_prepare = index_to_prepare + 1
+
+    # list used to keep track of the durations of the four videos in the playlist
     playlist_video_durations = [
         0.0,
         0.0,
