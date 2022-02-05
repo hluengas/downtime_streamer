@@ -80,27 +80,27 @@ def main():
                 index_playing = (index_playing + 1) % 4
                 index_to_prepare = (index_to_prepare + 1) % 4
 
-            # check based on video duration as a fall back
-            video_duration_elapsed = (time() > (playlist_video_start_times[index_playing] + playlist_video_durations[index_playing] + 15.0))
-            if(video_duration_elapsed):
+        # check based on video duration as a fall back
+        # video_duration_elapsed = (time() > (playlist_video_start_times[index_playing] + playlist_video_durations[index_playing] + 60.0))
+        # if(video_duration_elapsed):
 
-                # print debug
-                print(SECTION_BREAK)
-                print("[Failed To Detect Episode Change]")
-                print("[Duration Fail Safe Triggered]")
-                print("[Episode Completed]: " + str(index_playing) + "\n")
+        #     # print debug
+        #     print(SECTION_BREAK)
+        #     print("[Failed To Detect Episode Change]")
+        #     print("[Duration Fail Safe Triggered]")
+        #     print("[Episode Completed]: " + str(index_playing) + "\n")
 
-                # choose between episode and bumper
-                # then start the transcoding process to prep the video
-                if (index_to_prepare % 2):
-                    (playlist_video_start_times[index_to_prepare], playlist_video_durations[index_to_prepare]) = prepare_video(shuffed_bumper_list.pop(), index_to_prepare, is_bumper=False)
-                else:
-                    (playlist_video_start_times[index_to_prepare], playlist_video_durations[index_to_prepare]) = prepare_video(shuffed_episode_list.pop(), index_to_prepare, is_bumper=True)
+        #     # choose between episode and bumper
+        #     # then start the transcoding process to prep the video
+        #     if (index_to_prepare % 2):
+        #         (playlist_video_start_times[index_to_prepare], playlist_video_durations[index_to_prepare]) = prepare_video(shuffed_bumper_list.pop(), index_to_prepare, is_bumper=False)
+        #     else:
+        #         (playlist_video_start_times[index_to_prepare], playlist_video_durations[index_to_prepare]) = prepare_video(shuffed_episode_list.pop(), index_to_prepare, is_bumper=True)
 
-                # increment counters
-                index_playing = (index_playing + 1) % 4
-                index_to_prepare = (index_to_prepare + 1) % 4
-
+        #     # increment counters
+        #     index_playing = (index_playing + 1) % 4
+        #     index_to_prepare = (index_to_prepare + 1) % 4
+                
     # wait for prepared epsiodes to finish
     sleep(playlist_video_durations[index_playing] + playlist_video_durations[index_to_prepare])
     # terminate FFMPEG to stop it looping
