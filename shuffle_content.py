@@ -53,7 +53,6 @@ def main():
     (playlist_video_start_times[index_to_prepare], playlist_video_durations[index_to_prepare]) = prepare_video(shuffed_episode_list.pop(), index_to_prepare, is_bumper=False, is_blocking=False)
     index_to_prepare = index_to_prepare + 1
 
-    
     # while there is still content
     while(len(shuffed_episode_list) and len(shuffed_bumper_list)):
 
@@ -80,6 +79,8 @@ def main():
                 index_playing = (index_playing + 1) % 4
                 index_to_prepare = (index_to_prepare + 1) % 4
 
+        sleep(0.1)
+
         # check based on video duration as a fall back
         # video_duration_elapsed = (time() > (playlist_video_start_times[index_playing] + playlist_video_durations[index_playing] + 60.0))
         # if(video_duration_elapsed):
@@ -100,7 +101,7 @@ def main():
         #     # increment counters
         #     index_playing = (index_playing + 1) % 4
         #     index_to_prepare = (index_to_prepare + 1) % 4
-                
+
     # wait for prepared epsiodes to finish
     sleep(playlist_video_durations[index_playing] + playlist_video_durations[index_to_prepare])
     # terminate FFMPEG to stop it looping
@@ -161,9 +162,9 @@ def symlink_video(episode_path, link_path):
 
 
 def transcode_video(episode_input_path, index_to_prepare, is_bumper=False, is_blocking=False):
-    
+
     episode_output_path = PLAYLIST_VIDEO_PATHS[index_to_prepare]
-    
+
     # choose ffmpeg parameters for episode vs bumpers
     if (is_bumper):
         ffmpeg_command = FFMPEG_TRANSCODE_BUMPER_CMD.copy()
