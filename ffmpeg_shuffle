@@ -1,5 +1,8 @@
+# rockylinux build image
+# 2-stage build
 FROM rockylinux:latest as BUILD
 
+# add repos, upgrade, install dependencies
 RUN dnf install -y https://dl.fedoraproject.org/pub/epel/epel-release-latest-8.noarch.rpm && \
     dnf install -y https://mirrors.rpmfusion.org/free/el/rpmfusion-free-release-8.noarch.rpm && \
     dnf install -y https://mirrors.rpmfusion.org/nonfree/el/rpmfusion-nonfree-release-8.noarch.rpm && \
@@ -23,6 +26,7 @@ RUN dnf install -y https://dl.fedoraproject.org/pub/epel/epel-release-latest-8.n
     tree \
     zlib-devel
 
+# compile nasm assembler
 RUN mkdir /ffmpeg_sources && \
     cd /ffmpeg_sources && \
     curl -O -L https://www.nasm.us/pub/nasm/releasebuilds/2.15.05/nasm-2.15.05.tar.bz2 && \
@@ -33,6 +37,7 @@ RUN mkdir /ffmpeg_sources && \
     make -j 24 && \
     make install
 
+# compile yasm assembler
 RUN cd /ffmpeg_sources && \
     curl -O -L https://www.tortall.net/projects/yasm/releases/yasm-1.3.0.tar.gz && \
     tar xzvf yasm-1.3.0.tar.gz && \
@@ -41,6 +46,7 @@ RUN cd /ffmpeg_sources && \
     make -j 24 && \
     make install
 
+# compile x264
 RUN cd /ffmpeg_sources && \
     git clone --branch stable --depth 1 https://code.videolan.org/videolan/x264.git && \
     cd x264 && \
@@ -48,6 +54,7 @@ RUN cd /ffmpeg_sources && \
     make -j 24 && \
     make install
 
+# compile x265
 RUN cd /ffmpeg_sources && \
     git clone --branch stable --depth 2 https://bitbucket.org/multicoreware/x265_git && \
     cd /ffmpeg_sources/x265_git/build/linux && \
@@ -55,6 +62,7 @@ RUN cd /ffmpeg_sources && \
     make -j 24 && \
     make install
 
+# compile aac
 RUN cd /ffmpeg_sources && \
     git clone --depth 1 https://github.com/mstorsjo/fdk-aac && \
     cd fdk-aac && \
@@ -63,6 +71,7 @@ RUN cd /ffmpeg_sources && \
     make -j 24 && \
     make install
 
+# compile lame
 RUN cd /ffmpeg_sources && \
     curl -O -L https://downloads.sourceforge.net/project/lame/lame/3.100/lame-3.100.tar.gz && \
     tar xzvf lame-3.100.tar.gz && \
@@ -71,6 +80,7 @@ RUN cd /ffmpeg_sources && \
     make -j 24 && \
     make install
 
+# compile opus
 RUN cd /ffmpeg_sources && \
     curl -O -L https://archive.mozilla.org/pub/opus/opus-1.3.1.tar.gz && \
     tar xzvf opus-1.3.1.tar.gz && \
@@ -79,6 +89,7 @@ RUN cd /ffmpeg_sources && \
     make -j 24 && \
     make install
 
+# compile libvpx
 RUN cd /ffmpeg_sources && \
     git clone --depth 1 https://chromium.googlesource.com/webm/libvpx.git && \
     cd libvpx && \
@@ -86,6 +97,7 @@ RUN cd /ffmpeg_sources && \
     make -j 24 && \
     make install
 
+# compile ffmpeg
 RUN cd /ffmpeg_sources && \
     curl -O -L https://ffmpeg.org/releases/ffmpeg-5.0.tar.bz2 && \
     tar xjvf ffmpeg-5.0.tar.bz2 && \
@@ -111,8 +123,10 @@ RUN cd /ffmpeg_sources && \
     make -j 24 && \
     make install
 
+# rockylinux base image
 FROM rockylinux:latest
 
+# set environment variables
 ENV STREAM_ADDRESS "rtmp://address:port/live/stream_key"
 ENV EPISODE_DIR "/tmp/content/episodes"
 ENV BUMPER_DIR "/tmp/content/bumpers"
@@ -121,23 +135,23 @@ ENV VIDEO_ENCODER_PRESET "veryfast"
 ENV UID "99"
 ENV GID "100"
 
+# add repos, upgrade packages, add python and tree
 RUN dnf install -y https://dl.fedoraproject.org/pub/epel/epel-release-latest-8.noarch.rpm && \
-    dnf install -y https://mirrors.rpmfusion.org/free/el/rpmfusion-free-release-8.noarch.rpm && \
-    dnf install -y https://mirrors.rpmfusion.org/nonfree/el/rpmfusion-nonfree-release-8.noarch.rpm && \
-    dnf install -y dnf-plugins-core && \
     dnf upgrade -y && \
     dnf install -y \
     libass \
     python3 \
     tree
 
-# Copy Binary From Build Stage
-COPY --from=0 /tmp/bin /usr/bin
+# Copy Binaries from Build Stage
+COPY --from=BUILD /tmp/bin /usr/bin
 
-USER ${UID}:${GID}
-
+# Copy Scripts
 COPY ./shuffle_content.py /tmp/meta/shuffle_content.py
 COPY ./constants.py /tmp/meta/constants.py
 
+# Change User
+USER ${UID}:${GID}
 
+# Entrypoint
 CMD ["python3", "-u", "/tmp/meta/shuffle_content.py"]
