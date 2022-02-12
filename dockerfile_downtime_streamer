@@ -1,130 +1,5 @@
-# rockylinux build image
-# 2-stage build
-FROM rockylinux:latest as BUILD
-
-# add repos, upgrade, install dependencies
-RUN dnf install -y https://dl.fedoraproject.org/pub/epel/epel-release-latest-8.noarch.rpm && \
-    dnf install -y https://mirrors.rpmfusion.org/free/el/rpmfusion-free-release-8.noarch.rpm && \
-    dnf install -y https://mirrors.rpmfusion.org/nonfree/el/rpmfusion-nonfree-release-8.noarch.rpm && \
-    dnf install -y dnf-plugins-core && \
-    dnf upgrade -y && \
-    dnf install -y \
-    autoconf \
-    automake \
-    bzip2 \
-    bzip2-devel \
-    cmake \
-    freetype-devel \
-    gcc \
-    gcc-c++ \
-    git \
-    libass-devel \
-    libtool \
-    make \
-    pkgconfig \
-    python3 \
-    tree \
-    zlib-devel
-
-# compile nasm assembler
-RUN mkdir /ffmpeg_sources && \
-    cd /ffmpeg_sources && \
-    curl -O -L https://www.nasm.us/pub/nasm/releasebuilds/2.15.05/nasm-2.15.05.tar.bz2 && \
-    tar xjvf nasm-2.15.05.tar.bz2 && \
-    cd nasm-2.15.05 && \
-    ./autogen.sh && \
-    ./configure --prefix="/tmp/ffmpeg_build" --bindir="/bin"&& \
-    make -j 24 && \
-    make install
-
-# compile yasm assembler
-RUN cd /ffmpeg_sources && \
-    curl -O -L https://www.tortall.net/projects/yasm/releases/yasm-1.3.0.tar.gz && \
-    tar xzvf yasm-1.3.0.tar.gz && \
-    cd yasm-1.3.0 && \
-    ./configure --prefix="/tmp/ffmpeg_build" --bindir="/bin" && \
-    make -j 24 && \
-    make install
-
-# compile x264
-RUN cd /ffmpeg_sources && \
-    git clone --branch stable --depth 1 https://code.videolan.org/videolan/x264.git && \
-    cd x264 && \
-    PKG_CONFIG_PATH="/tmp/ffmpeg_build/lib/pkgconfig" ./configure --prefix="/tmp/ffmpeg_build" --bindir="/tmp/bin" --enable-static && \
-    make -j 24 && \
-    make install
-
-# compile x265
-RUN cd /ffmpeg_sources && \
-    git clone --branch stable --depth 2 https://bitbucket.org/multicoreware/x265_git && \
-    cd /ffmpeg_sources/x265_git/build/linux && \
-    cmake -G "Unix Makefiles" -DCMAKE_INSTALL_PREFIX="/tmp/ffmpeg_build" -DENABLE_SHARED:bool=off ../../source && \
-    make -j 24 && \
-    make install
-
-# compile aac
-RUN cd /ffmpeg_sources && \
-    git clone --depth 1 https://github.com/mstorsjo/fdk-aac && \
-    cd fdk-aac && \
-    autoreconf -fiv && \
-    ./configure --prefix="/tmp/ffmpeg_build" --disable-shared && \
-    make -j 24 && \
-    make install
-
-# compile lame
-RUN cd /ffmpeg_sources && \
-    curl -O -L https://downloads.sourceforge.net/project/lame/lame/3.100/lame-3.100.tar.gz && \
-    tar xzvf lame-3.100.tar.gz && \
-    cd lame-3.100 && \
-    ./configure --prefix="/tmp/ffmpeg_build" --bindir="/tmp/bin" --disable-shared --enable-nasm && \
-    make -j 24 && \
-    make install
-
-# compile opus
-RUN cd /ffmpeg_sources && \
-    curl -O -L https://archive.mozilla.org/pub/opus/opus-1.3.1.tar.gz && \
-    tar xzvf opus-1.3.1.tar.gz && \
-    cd opus-1.3.1 && \
-    ./configure --prefix="/tmp/ffmpeg_build" --disable-shared && \
-    make -j 24 && \
-    make install
-
-# compile libvpx
-RUN cd /ffmpeg_sources && \
-    git clone --depth 1 https://chromium.googlesource.com/webm/libvpx.git && \
-    cd libvpx && \
-    ./configure --prefix="/tmp/ffmpeg_build" --disable-examples --disable-unit-tests --enable-vp9-highbitdepth --as=yasm && \
-    make -j 24 && \
-    make install
-
-# compile ffmpeg
-RUN cd /ffmpeg_sources && \
-    curl -O -L https://ffmpeg.org/releases/ffmpeg-5.0.tar.bz2 && \
-    tar xjvf ffmpeg-5.0.tar.bz2 && \
-    cd ffmpeg-5.0 && \
-    PATH="/bin" PKG_CONFIG_PATH="/tmp/ffmpeg_build/lib/pkgconfig" ./configure \
-    --prefix="/tmp/ffmpeg_build" \
-    --pkg-config-flags="--static" \
-    --extra-cflags="-I/tmp/ffmpeg_build/include" \
-    --extra-ldflags="-L/tmp/ffmpeg_build/lib" \
-    --extra-libs=-lpthread \
-    --extra-libs=-lm \
-    --bindir="/tmp/bin" \
-    --enable-gpl \
-    --enable-libfdk_aac \
-    --enable-libfreetype \
-    --enable-libmp3lame \
-    --enable-libopus \
-    --enable-libvpx \
-    --enable-libx264 \
-    --enable-libx265 \
-    --enable-libass \
-    --enable-nonfree && \
-    make -j 24 && \
-    make install
-
 # rockylinux base image
-FROM rockylinux:latest
+FROM hluengas/rocky_ffmpeg:latest
 
 # set environment variables
 ENV STREAM_ADDRESS "rtmp://address:port/live/stream_key"
@@ -139,19 +14,15 @@ ENV GID "100"
 RUN dnf install -y https://dl.fedoraproject.org/pub/epel/epel-release-latest-8.noarch.rpm && \
     dnf upgrade -y && \
     dnf install -y \
-    libass \
     python3 \
     tree
 
-# Copy Binaries from Build Stage
-COPY --from=BUILD /tmp/bin /usr/bin
-
 # Copy Scripts
-COPY ./shuffle_content.py /tmp/meta/shuffle_content.py
+COPY ./downtime_streamer.py /tmp/meta/downtime_streamer.py.py
 COPY ./constants.py /tmp/meta/constants.py
 
 # Change User
 USER ${UID}:${GID}
 
 # Entrypoint
-CMD ["python3", "-u", "/tmp/meta/shuffle_content.py"]
+CMD ["python3", "-u", "/tmp/meta/downtime_streamer.py"]
