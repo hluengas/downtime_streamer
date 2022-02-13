@@ -6,10 +6,10 @@ EPISODE_PATH = environ.get("EPISODE_DIR")
 BUMPER_PATH = environ.get("BUMPER_DIR")
 META_PATH = environ.get("META_DIR")
 
+LOGFILE_PATH = META_PATH + "/downtime_streamer_log.txt"
 PLAYLIST_PATH = META_PATH + "/ffmpeg_playlist.txt"
-TREE_PATH = META_PATH + "/tree.txt"
 
-SECTION_BREAK = "#########################################################################"
+SECTION_BREAK = "#########################################################################\n"
 
 PLAYLIST_VIDEO_PATHS = [
     META_PATH + "/video_0.flv",
@@ -32,7 +32,7 @@ PLAYLIST = [
     "file \'" + PLAYLIST_VIDEO_PATHS[3] + "\'\n"
 ]
 
-FFPROBE_CMD = [
+FFPROBE_DURATION = [
     "ffprobe",
     "-v",
     "error",
@@ -40,6 +40,16 @@ FFPROBE_CMD = [
     "format=duration",
     "-of",
     "default=noprint_wrappers=1:nokey=1",
+]
+
+FFPROBE_JSON = [
+    "ffprobe",
+    "-show_format",
+    "-show_streams",
+    "-print_format",
+    "json",
+    "-loglevel",
+    "quiet"
 ]
 
 FFMPEG_STREAM_CMD = [

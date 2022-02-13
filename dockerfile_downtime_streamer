@@ -3,10 +3,10 @@ FROM hluengas/rocky_ffmpeg:latest
 
 # set environment variables
 ENV STREAM_ADDRESS "rtmp://address:port/live/stream_key"
-ENV EPISODE_DIR "/tmp/content/episodes"
-ENV BUMPER_DIR "/tmp/content/bumpers"
-ENV META_DIR "/tmp/content/meta"
-ENV VIDEO_ENCODER_PRESET "veryfast"
+ENV EPISODE_DIR "/tmp/episodes"
+ENV BUMPER_DIR "/tmp/bumpers"
+ENV META_DIR "/tmp/meta"
+ENV VIDEO_ENCODER_PRESET "ultrafast"
 ENV UID "99"
 ENV GID "100"
 
@@ -18,11 +18,11 @@ RUN dnf install -y https://dl.fedoraproject.org/pub/epel/epel-release-latest-8.n
     tree
 
 # Copy Scripts
-COPY ./downtime_streamer.py /tmp/meta/downtime_streamer.py.py
-COPY ./constants.py /tmp/meta/constants.py
+COPY ./downtime_streamer.py /tmp/downtime_streamer.py
+COPY ./constants.py /tmp/constants.py
 
 # Change User
 USER ${UID}:${GID}
 
 # Entrypoint
-CMD ["python3", "-u", "/tmp/meta/downtime_streamer.py"]
+CMD ["python3", "-u", "/tmp/downtime_streamer.py"]
