@@ -8,6 +8,7 @@ META_PATH = environ.get("META_DIR")
 
 LOGFILE_PATH = META_PATH + "/downtime_streamer_log.txt"
 PLAYLIST_PATH = META_PATH + "/ffmpeg_playlist.txt"
+MEDIA_INFO_PATH = META_PATH + "/mediainfo"
 
 SECTION_BREAK = "#########################################################################\n"
 
@@ -39,7 +40,7 @@ FFPROBE_DURATION = [
     "-show_entries",
     "format=duration",
     "-of",
-    "default=noprint_wrappers=1:nokey=1",
+    "default=noprint_wrappers=1:nokey=1"
 ]
 
 FFPROBE_JSON = [

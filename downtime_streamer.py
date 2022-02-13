@@ -1,20 +1,20 @@
 from cgitb import text
+from os import popen
 from sys import exit, stderr, stdout
 from random import sample
-from os.path import isfile
+from os.path import isfile, isdir
 from subprocess import Popen, PIPE, STDOUT
 from time import time, localtime, sleep
 
 from constants import *
 
-import asyncio
 import json
 
 
 def main():
 
     # get a list of paths to all available episodes
-    master_episode_list = parse_content_directory(EPISODE_PATH, use_white_list=True)
+    master_episode_list = parse_content_directory(EPISODE_PATH, use_white_list=False)
     master_bumper_list = parse_content_directory(BUMPER_PATH)
 
     # generate a random ordering of the epsiode list
@@ -25,40 +25,62 @@ def main():
     create_playlist_file(PLAYLIST, PLAYLIST_PATH)
     create_logfile(LOGFILE_PATH)
 
-    get_media_json(shuffed_episode_list.pop())
+    # prep videos 1 & 2
+    prepare_video(shuffed_episode_list.pop(), 0, is_blocking=True)
+    prepare_video(shuffed_bumper_list.pop(), 1, is_blocking=True, is_bumper=True)
 
+    # start ffmpeg
+    ffmpeg_stream_process = Popen(FFMPEG_STREAM_CMD, stdout=PIPE, stderr=STDOUT, universal_newlines=True)
+    index_playing = 0
+    log_line("[Stream Started!]\n", section_break=True)
 
-# transcode the desired video, then
-# symlink the output video to the desired link in the playlist swap-chain
+    # prep video 3
+    prepare_video(shuffed_episode_list.pop(), index_to_prepare)
+    index_to_prepare = 3
+
+    # while more shuffled content is available
+    while(len(shuffed_episode_list) and len(shuffed_bumper_list)):
+        # read ffmpeg stream debug output
+        for line in ffmpeg_stream_process.stdout:
+            # lines with "Statistics:" indicate the muxer has transitioned videos
+            if("Statistics:" in line):
+                # log
+                log_line(line, section_break=True)
+                log_line("[Detected Episode Change]")
+                log_line("[Episode Completed]: " + str(index_playing) + "\n")
+
+                # choose between episode and bumper
+                # then start the transcoding process to prep the video
+                if (index_to_prepare % 2):
+                    prepare_video(shuffed_bumper_list.pop(), index_to_prepare, is_bumper=False)
+                else:
+                    prepare_video(shuffed_episode_list.pop(), index_to_prepare, is_bumper=True)
+
+                # increment counters
+                index_playing = (index_playing + 1) % 4
+                index_to_prepare = (index_to_prepare + 1) % 4
+
+# transcode the desired video
 def prepare_video(video_path, index_to_prepare, is_bumper=False, is_blocking=False):
-
-    # get the duration of the video file
-    video_duration = get_media_duration(video_path)
 
     # print debug info
     log_line(LOGFILE_PATH, ("[Preparing Video]: " + str(index_to_prepare)), section_break=True)
     log_line(LOGFILE_PATH, ("[Source Path]: " + video_path))
     log_line(LOGFILE_PATH, ("[Transcoding To]: " + PLAYLIST_VIDEO_PATHS[index_to_prepare]))
-    log_line(LOGFILE_PATH, ("[Duration]: " + str(video_duration) + " seconds\n"))
 
     # transcode the desired video to the desired output video in the playlist swap-chain
-    start_time = time()
-    transcode_video(video_path, index_to_prepare, is_bumper, is_blocking)
+    transcode_video_cmd = [
+        "python3",
+        "transcode_worker_script.py",
+        video_path,
+        index_to_prepare,
+        is_bumper
+    ]
+    transcoding_script = Popen(transcode_video_cmd)
 
-    return (start_time, video_duration)
-
-
-def get_media_json(content_path):
-    # the FFPROBE command is tuned to only output the duration of the media in seconds
-    # duplicate the command and append the desired path
-    ffprobe_command = FFPROBE_JSON.copy()
-    ffprobe_command.append(content_path)
-
-    # run FFPROBE
-    ffprobe_process = Popen(ffprobe_command, stdout=PIPE)
-    (output, _error) = ffprobe_process.communicate()
-    log_line(output)
-    print(output)
+    # if flag given, wait on worker script
+    if (is_blocking):
+        (_output, _error) = transcoding_script.communicate()
 
 
 # get the duration in seconds of the video at the given path
@@ -70,53 +92,9 @@ def get_media_duration(content_path):
     ffprobe_command.append(content_path)
 
     # run FFPROBE
-    ffprobe_process = Popen(ffprobe_command, stdout=PIPE)
+    ffprobe_process = Popen(ffprobe_command, stdout=PIPE, universal_newlines=True)
     (output, _error) = ffprobe_process.communicate()
     return(float(output))
-
-
-# link the video at "episode_path" to the symbolic link at link_path"
-def symlink_video(episode_path, link_path):
-
-    # create link command
-    # -s for soft/symbolic link
-    # -f to force, overwriting existing symlinks
-    link_command = [
-        "ln",
-        "-sf",
-        episode_path,
-        link_path,
-    ]
-
-    # link episode
-    link_process = Popen(link_command, stdout=PIPE)
-    (_output, _error) = link_process.communicate()
-
-
-def transcode_video(episode_input_path, index_to_prepare, is_bumper=False, is_blocking=False):
-
-    episode_output_path = PLAYLIST_VIDEO_PATHS[index_to_prepare]
-
-    # choose ffmpeg parameters for episode vs bumpers
-    if (is_bumper):
-        ffmpeg_command = FFMPEG_TRANSCODE_BUMPER_CMD.copy()
-    else:
-        ffmpeg_command = FFMPEG_TRANSCODE_EPISODE_CMD.copy()
-
-    # set input & output paths
-    ffmpeg_command[3] = episode_input_path
-    ffmpeg_command.append(episode_output_path)
-
-    # start ffmpeg
-    ffmpeg_process = Popen(ffmpeg_command, stdout=PIPE, stderr=STDOUT, universal_newlines=True)
-
-    # this flag is used to halt the script until the video has finished transcoding
-    if (is_blocking):
-        log_line(LOGFILE_PATH, ("[Waiting For Transcoding To Finish]\n"))
-        (_output, _error) = ffmpeg_process.communicate()
-    else:
-        log_line(LOGFILE_PATH, ("[Transcoding In Background]"))
-        log_line(LOGFILE_PATH, ("[Waiting For Video]: " + str(index_to_prepare - 2)))
 
 
 # get a list of paths to video content under a given target directory
@@ -165,6 +143,7 @@ def log_line(logfile_path, line, section_break=False, line_ending='\n'):
     else:
         with open(logfile_path, 'a') as logfile:
             logfile.write(line + line_ending)
+
 
 # create the swap-chain playlsit: episode_a -> bumper_a -> episode_b -> bumper_b -> ... repeat...
 def create_playlist_file(playlist, playlist_path):
